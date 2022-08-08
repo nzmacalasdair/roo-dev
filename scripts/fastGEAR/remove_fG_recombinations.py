@@ -30,6 +30,8 @@ def remove_recombinations(recombinations, alignments, out_dir):
         sequence_names = [x.id for x in sequences]
         for recombination in recombinations[gene]:
             length = recombination["stop"] - recombination["start"]
+            if type(recombination["isolates"]) != list:
+                recombination["isolates"] = [recombination["isolates"]]
             for isolate in recombination["isolates"]:
                 isolate_index = sequence_names.index(isolate)
                 recombinant_sequence = sequences[isolate_index].seq
