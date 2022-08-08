@@ -135,6 +135,9 @@ def summarise_fastGEAR(result_directory, clustering_file):
         clustering = None
         
     for gene in gene_list:
+        #ignore any files in the results directory
+        if os.path.isfile(gene):
+            continue
         recombinations += parse_recent_recombinations(result_directory +'/'+ gene, clustering)
         recombinations += parse_ancestral_recombinations(result_directory +'/'+ gene, clustering)
     
