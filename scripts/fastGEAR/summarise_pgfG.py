@@ -160,9 +160,17 @@ def write_output(summary, outname):
         
     for index in range(len(recombinations)):
         if type(recombinations[index]) == Recomb_event:
+            if type(recombinations[index].donor_recipient[0]) == list:
+                d = "~".join(recombinations[index].donor_recipient[0])
+            else:
+                d = recombinations[index].donor_recipient[0]
+            if type(recombinations[index].donor_recipient[1]) == list:
+                r = "~".join(recombinations[index].donor_recipient[1])
+            else:
+                r = recombinations[index].donor_recipient[1]
             outline1 = recombinations[index].gene +','+ recombinations[index].age +','+ recombinations[index].start() +','+ recombinations[index].end()+','
-            outline2 = str(recombinations[index].score) +','+ "~".join(recombinations[index].donor_recipient[0])+','   
-            outline3 = "~".join(recombinations[index].donor_recipient[1]) +','+ str(recombinations[index].donor_group()) +','+ str(recombinations[index].recipient_group())
+            outline2 = str(recombinations[index].score) +','+ d +','   
+            outline3 = r +','+ str(recombinations[index].donor_group()) +','+ str(recombinations[index].recipient_group())
             outline = outline1 + outline2 + outline3 + '\n'
             output.write(outline)
     
