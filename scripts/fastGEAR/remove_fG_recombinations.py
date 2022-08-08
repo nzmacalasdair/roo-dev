@@ -1,5 +1,4 @@
 import os
-from .isvalid import *
 import shutil
 
 from Bio import SeqIO
@@ -32,14 +31,14 @@ def remove_recombinations(recombinations, alignments, out_dir):
         for recombination in recombinations[gene]:
             length = recombination["stop"] - recombination["start"]
             for isolate in recombination["isolates"]:
-                isolate_index = sequnece_names.index(isolate)
+                isolate_index = sequence_names.index(isolate)
                 recombinant_sequence = sequences[isolate_index].seq
                 new_sequence = str(recombinant_sequence[:recombination["start"]])
                 new_sequence += length * "-"
                 new_sequence += str(recombinant_sequence[recombination["stop"]:])
                 new_sequence = Seq(new_sequence)
                 
-                sequences[index].seq = new_sequence
+                sequences[isolate_index].seq = new_sequence
         outname = out_dir + "recombination_free_aligned_genes/" + gene +".aln.fas"
         SeqIO.write(sequences, outname, 'fasta')
     
@@ -62,8 +61,7 @@ if __name__ == '__main__':
                          "--out_dir",
                          dest="output_dir",
                          required=True,
-                         help="location of the Panaroo output directory",
-                         type=lambda x: is_valid_folder(parser, x))
+                         help="location of the Panaroo output directory")
     parser.add_argument('--recombinations',
                         default=None,
                         dest="recombs",
