@@ -67,13 +67,21 @@ def parse_recent_recombinations(gene_path, clustering):
             if linenumber > 2:
                 splitline = line.split()
                 lineages = parse_lineage_information(gene_path + "/output/lineage_information.txt")
-                cluster_map = parse_cluster_remap(gene_path + "/cluster_mapping.txt")
+                if type(clustering) == dict:
+                    cluster_map = parse_cluster_remap(gene_path + "/cluster_mapping.txt")
                 position = (splitline[0], splitline[1])
                 clean_name = "_".join(splitline[5].split("_")[:-1])
                 clean_name= clean_name.split(";")[0]
                 donor_recipient = (lineages.get(splitline[2], "Ukwn"), splitline[5])
-                dg_rg = (cluster_map.get(splitline[2], "Ukwn"), clustering.get(clean_name))
-                recombination = Recomb_event(gene_path.split("/")[-1], "recent", position , donor_recipient, dg_rg, float(splitline[4]))
+                if type(clustering) == dict:
+                    dg_rg = (cluster_map.get(splitline[2], "Ukwn"), clustering.get(clean_name))
+                    recombination = Recomb_event(gene_path.split("/")[-1], 
+                                                 "recent", position , donor_recipient, 
+                                                 dg_rg, float(splitline[4]))
+                else:
+                    recombination = Recomb_event(gene_path.split("/")[-1], 
+                                                 "recent", position , donor_recipient, 
+                                                 ["NA", "NA"], float(splitline[4]))
                 gene_recombinations.append(recombination)  
     return gene_recombinations
 
@@ -95,11 +103,19 @@ def parse_ancestral_recombinations(gene_path, clustering):
             if linenumber > 2:
                 splitline = line.split()
                 lineages = parse_lineage_information(gene_path + "/output/lineage_information.txt")
-                cluster_map = parse_cluster_remap(gene_path + "/cluster_mapping.txt")
+                if type(clustering) == dict:
+                    cluster_map = parse_cluster_remap(gene_path + "/cluster_mapping.txt")
                 position = (splitline[0], splitline[1])
                 donor_recipient = (lineages.get(splitline[2], "Ukwn"), lineages.get(splitline[3]))
-                dg_rg = (cluster_map.get(splitline[2], "Ukwn"), cluster_map.get(splitline[3], "Ukwn"))
-                recombination = Recomb_event(gene_path.split("/")[-1], "ancestral", position , donor_recipient, dg_rg, float(splitline[4]))
+                if type(clustering) == dict:
+                    dg_rg = (cluster_map.get(splitline[2], "Ukwn"), cluster_map.get(splitline[3], "Ukwn"))
+                    recombination = Recomb_event(gene_path.split("/")[-1], 
+                                                 "ancestral", position , donor_recipient, 
+                                                 dg_rg, float(splitline[4]))
+                else:
+                    recombination = Recomb_event(gene_path.split("/")[-1], 
+                                                 "ancestral", position , donor_recipient, 
+                                                 ["NA", "NA"], float(splitline[4]))                    
                 gene_recombinations.append(recombination)  
     return gene_recombinations
 
@@ -108,28 +124,36 @@ def summarise_fastGEAR(result_directory, clustering_file):
     
     gene_list = os.listdir(result_directory)
     
-    clustering = {}    
-    with open(clustering_file, 'r') as temphandle:
-        parsed = temphandle.read().splitlines()[1:]
-        for line in parsed:
-            splitline = line.split(',')
-            clustering[splitline[0]] = splitline[1]
-    
-    
+    if type(clustering_file) == str:
+        clustering = {}    
+        with open(clustering_file, 'r') as temphandle:
+            parsed = temphandle.read().splitlines()[1:]
+            for line in parsed:
+                splitline = line.split(',')
+                clustering[splitline[0]] = splitline[1]
+    else:
+        clustering = None
+        
     for gene in gene_list:
         recombinations += parse_recent_recombinations(result_directory +'/'+ gene, clustering)
         recombinations += parse_ancestral_recombinations(result_directory +'/'+ gene, clustering)
     
     return recombinations
 
-def write_output(summary):
+def write_output(summary, outname):
     
     recombinations = filter(None, summary)
     at_least_one_no_recombination = []
     no_recombs = open("genes_without_recombination.txt", 'w+')
+    
+    if outname[-4:] != ".csv":
+        outname = outname + ".csv"
 
-    output = open("fastGEAR_recombinations.csv", 'w+')
-    output.write("Gene, Age, RecombStart, RecombEnd, Score, Donor_lineage, Recipient_strain, Donor_group, Strain_group\n")
+    output = open(outname, 'w+')
+    
+    header = "Gene, Age, RecombStart, RecombEnd, Score, Donor_lineage, "
+    header += "Recipient_strain, Donor_group, Strain_group\n"    
+    output.write(header)
         
     for index in range(len(recombinations)):
         if type(recombinations[index]) == Recomb_event:
@@ -154,11 +178,21 @@ if __name__ == '__main__':
     import argparse
     
     parser = argparse.ArgumentParser(description="")
-    parser.add_argument('result_dir', help="Directory containing fastGEAR results on a pan-genome")
-    parser.add_argument('--clustering', help="Path to a .csv containing cluster information if used")
+    parser.add_argument('result_dir', 
+                        help="Directory containing fastGEAR results on a pan-genome")
+    parser.add_argument("-o",
+                        "--output",
+                        dest="output",
+                        default="fastGEAR_recombinations",
+                        help="Name of output csv, default: fastGEAR_recombinations")
+    parser.add_argument('--clustering',
+                        default=None,
+                        help="""Path to a .csv containing cluster 
+                        information if a separate genome-level clustering (such 
+                        as PopPUNK) was used to run fastGEAR on every gene""")
     args = parser.parse_args()
     
     
     results = os.path.dirname(os.path.abspath(args.result_dir)) + '/' + args.result_dir.strip('/')
     fG_summary = summarise_fastGEAR(results, args.clustering)
-    write_output(fG_summary)
+    write_output(fG_summary, args.output)
