@@ -168,7 +168,7 @@ def write_output(summary, outname):
 
     output.close()
     neither_recombination = list(set([x for x in at_least_one_no_recombination if at_least_one_no_recombination.count(x) > 1]))
-    no_recombs = open("genes_without_recombination.txt", 'w+')
+    no_recombs = open(outname.split(".")[0] + "_genes_without_recombination.txt", 'w+')
     for gene in neither_recombination:
         no_recombs.write(gene + '\n')
     no_recombs.close()
