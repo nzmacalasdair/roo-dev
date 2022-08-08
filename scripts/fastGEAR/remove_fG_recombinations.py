@@ -33,6 +33,8 @@ def remove_recombinations(recombinations, alignments, out_dir):
             if type(recombination["isolates"]) != list:
                 recombination["isolates"] = [recombination["isolates"]]
             for isolate in recombination["isolates"]:
+                print(isolate)
+                print(recombination["isolates"])
                 isolate_index = sequence_names.index(isolate)
                 recombinant_sequence = sequences[isolate_index].seq
                 new_sequence = str(recombinant_sequence[:recombination["start"]])
