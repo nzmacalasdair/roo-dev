@@ -7,7 +7,7 @@ from Bio.Seq import Seq
 def parse_recombination_file(filename):
     gene_recombinations = {}
     with open(filename, 'r') as inhandle:
-        lines = filename.read().splitlines()
+        lines = inhandle.read().splitlines()
     header = "Gene,Age,RecombStart,RecombEnd,Score,Donor_lineage,Recipient_strain,Donor_group,Strain_group"
     for line in lines:
         if line == header:
