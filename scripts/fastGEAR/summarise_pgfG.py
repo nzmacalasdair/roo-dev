@@ -147,7 +147,6 @@ def write_output(summary, outname):
     
     recombinations = filter(None, summary)
     at_least_one_no_recombination = []
-    no_recombs = open("genes_without_recombination.txt", 'w+')
     
     if outname[-4:] != ".csv":
         outname = outname + ".csv"
