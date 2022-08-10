@@ -16,9 +16,8 @@ def get_core_gene_nodes(G, threshold, num_isolates):
     return core_nodes
 
 
-def concatenate_core_genome_alignments(core_names, output_dir):
-
-    alignments_dir = output_dir + "recombination_free_aligned_genes/"
+def concatenate_core_genome_alignments(alignments_dir, core_names, output_dir,
+                                       output_prefix):
     #Open up each alignment that is assosciated with a core node
     alignment_filenames = os.listdir(alignments_dir)
     core_filenames = [
@@ -54,12 +53,12 @@ def concatenate_core_genome_alignments(core_names, output_dir):
         isolate_aln.append(SeqRecord(seq, id=iso, description=""))
 
     #Write out the two output files
-    SeqIO.write(isolate_aln, output_dir + 'recombination_free_core_gene_alignment.aln', 'fasta')
+    SeqIO.write(isolate_aln, output_dir + output_prefix + '_alignment.aln', 'fasta')
 
-    write_alignment_header(gene_alignments, output_dir)
+    write_alignment_header(gene_alignments, output_dir, output_prefix)
     return core_filenames
 
-def write_alignment_header(alignment_list, outdir):
+def write_alignment_header(alignment_list, outdir, prefix):
     out_entries = []
     #Set the tracking variables for gene positions
     gene_start = 1
@@ -85,7 +84,7 @@ def write_alignment_header(alignment_list, outdir):
     footer = ("XX\nSQ   Sequence 1234 BP; 789 A; 1717 C; 1693 G; 691 T;" +
               " 0 other;\n//\n")
     #open file and output
-    with open(outdir + "recombination_free_core_alignment_header.embl", "w+") as outhandle:
+    with open(outdir + prefix+"_alignment_header.embl", "w+") as outhandle:
         outhandle.write(header)
         for entry in out_entries:
             outhandle.write(entry)
@@ -111,7 +110,12 @@ if __name__ == '__main__':
                       dest="core",
                       help="Core-genome sample threshold (default=0.95)",
                       type=float,
-                      default=0.95)    
+                      default=0.95)
+    parser.add_argument("--filtered-core",
+                        dest="prefiltered",
+                        default=None,
+                        help="""Provide a folder in the panaroo output 
+                        containing a filtered set of core genes""")    
     args = parser.parse_args()
     
     # make sure trailing forward slash is present
@@ -128,10 +132,19 @@ if __name__ == '__main__':
                 isolate_names.append(iso)
                 seen.add(iso)
     
-    #load graph
-    G = nx.read_gml(args.output_dir + "final_graph.gml")
-
-    #Identify core
-    core_nodes = get_core_gene_nodes(G, args.core, len(isolate_names))
-    core_names = [G.nodes[x]["name"] for x in core_nodes]
-    concatenate_core_genome_alignments(core_names, args.output_dir)
+    if type(args.prefiltered) == str:
+        files = os.listdir(args.prefiltered)
+        filt_names = [x.split('.')[0] for x in files]
+        concatenate_core_genome_alignments(args.prefiltered, 
+                                           filt_names, args.output_dir)
+        
+    else:
+        #load graph
+        G = nx.read_gml(args.output_dir + "final_graph.gml")
+    
+        #Identify core
+        core_nodes = get_core_gene_nodes(G, args.core, len(isolate_names))
+        core_names = [G.nodes[x]["name"] for x in core_nodes]
+        concatenate_core_genome_alignments(args.output_dir + "recombination_free_aligned_genes/",
+                                           core_names, args.output_dir,
+                                           "recombination_free_core_gene")
