@@ -1,4 +1,5 @@
 import os
+import shutil
 
 import networkx as nx
 from Bio import SeqIO
@@ -74,6 +75,10 @@ if __name__ == '__main__':
                         help="""Average pairwise distance threshold 
                         [snps/length] at which genes are discarded from core""",
                         default = 0.05)
+    parser.add_argument("--copy",
+                       dest="copy",
+                       help="Flag to copy filter-passing genes to new directory",
+                       action="store_true")
 
     args = parser.parse_args()
     
@@ -105,5 +110,12 @@ if __name__ == '__main__':
     concatenate_core_genome_alignments(args.output_dir + 'aligned_gene_sequences/',
                                        passed_distance, args.output_dir, 
                                        "filtered_core_gene")
+    #copy genes
+    if args.copy == True:
+        os.mkdir(args.output_dir + "filtered_gene_alignments/")
+        for gene in passed_distance:
+            shutil.copy(args.output_dir + 'aligned_gene_sequences/'+gene+".aln.fas",
+                        args.output_dir + 'filtered_gene_alignments/'+gene+".aln.fas")
+        
                                       
     
