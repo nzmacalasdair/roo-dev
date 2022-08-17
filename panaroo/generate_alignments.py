@@ -294,7 +294,7 @@ def realign_dna_sequences(command, outdir, aligner):
         with open(command[0][-1], 'wb') as outhandle:
             outhandle.write(mafft_out)
     elif aligner == "clustal":
-        result = subprocess.Popen(command[0])
+        result = subprocess.check_call(command[0])
     
     #Delete the bad DNA seqs file
     try:
