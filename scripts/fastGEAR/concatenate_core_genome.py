@@ -136,7 +136,7 @@ if __name__ == '__main__':
         files = os.listdir(args.prefiltered)
         filt_names = [x.split('.')[0] for x in files]
         concatenate_core_genome_alignments(args.prefiltered, 
-                                           filt_names, args.output_dir)
+                                           filt_names, args.output_dir, "filtered_core_gene")
         
     else:
         #load graph
