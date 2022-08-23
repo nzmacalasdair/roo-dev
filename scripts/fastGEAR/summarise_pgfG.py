@@ -145,7 +145,7 @@ def summarise_fastGEAR(result_directory, clustering_file):
 
 def write_output(summary, outname):
     
-    recombinations = filter(None, summary)
+    recombinations = list(filter(None, summary))
     at_least_one_no_recombination = []
     
     if outname[-4:] != ".csv":

@@ -48,10 +48,6 @@ def remove_recombinations(recombinations, alignments, out_dir):
                 
         
 
-    
-
-
-
 if __name__ == '__main__':
     import argparse
     
@@ -69,6 +65,10 @@ if __name__ == '__main__':
                         dest="recombs",
                         help="""Path to a .csv containing the recombination data
                         from a fastGEAR run summarised by summarise_pgfG.py""")
+    parser.add_argument('--filtered',
+                        dest="filt",
+                        action="store_true",
+                        help="Filtered or unfiltered alignments")
     args = parser.parse_args()
 
     #prepare files, output folder    
@@ -77,7 +77,10 @@ if __name__ == '__main__':
     os.mkdir(args.output_dir + "recombination_free_aligned_genes/")
     
     #read in data
-    alignment_list = os.listdir(args.output_dir + "aligned_gene_sequences/")
+    if args.filt:
+        alignment_list = os.listdir(args.output_dir + "filtered_gene_alignments/")
+    else:        
+        alignment_list = os.listdir(args.output_dir + "aligned_gene_sequences/")
     gene_recombinations = parse_recombination_file(args.recombs)
     
     #remove recombination regions from alignments
