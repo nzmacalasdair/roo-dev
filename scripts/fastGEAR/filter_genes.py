@@ -48,7 +48,7 @@ def is_conserved(seqs, threshold):
     length = float(len(ref))
     for seq in seqs[1:]:
         if (
-            np.sum(np.fromstring(str(seq[1].lower()), dtype=np.int8) == ref) / length
+            np.sum(np.fromstring(str(seq.seq.lower()), dtype=np.int8) == ref) / length
             < threshold
         ):
             return False
@@ -132,12 +132,12 @@ if __name__ == '__main__':
     
     #check gapppedness
     passed_gaps = check_gappedness(core_names, args.gap, args.output_dir)
-    print(str(len(passed_gaps)) + " sequence passed gap filter")
+    print(str(len(passed_gaps)) + " sequences passed gap filter")
     #check distance
     #passed_distance = check_diversity(passed_gaps, args.dist, args.output_dir)
     #check divergence
     passed_distance = check_divergence(passed_gaps, args.dist, args.output_dir)
-    print(str(len(passed_distance)) + " sequence passed divergence filter")    
+    print(str(len(passed_distance)) + " sequences passed divergence filter")    
     #output filtered core genome
     concatenate_core_genome_alignments(args.output_dir + 'aligned_gene_sequences/',
                                        passed_distance, args.output_dir, 
