@@ -100,7 +100,8 @@ if __name__ == '__main__':
                         dest="dist",
                         help="""Max. Pairwise distance threshold 
                          between seqs. at which genes are discarded from core""",
-                        default = 0.9)
+                        default = 0.9,
+                        type=float)
     
     parser.add_argument("--copy",
                        dest="copy",
