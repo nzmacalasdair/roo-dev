@@ -44,7 +44,7 @@ def check_diversity(genelist, threshold, outdir):
 
 def is_conserved(seqs, threshold):
     # compare everything to the first sequence
-    ref = np.fromstring(str(seqs[0].seq), dtype=np.int8)
+    ref = np.fromstring(str(seqs[0].seq.lower()), dtype=np.int8)
     length = float(len(ref))
     for seq in seqs[1:]:
         if (
