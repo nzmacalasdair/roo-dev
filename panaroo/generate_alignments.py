@@ -185,7 +185,8 @@ def get_alignment_commands(fastafile_name, outdir, aligner, threads):
             command = MafftCommandline(input=fastafile_name,
                                        auto=True,
                                        thread=threads,
-                                       nuc=True)
+                                       nuc=True,
+                                       adjustdirection=True,)
         elif aligner == "clustal":
             command = ClustalOmegaCommandline(
                 infile=fastafile_name,
@@ -209,7 +210,8 @@ def get_protein_commands(fastafile_name, outdir, aligner, threads):
         if aligner == "mafft":
             command = MafftCommandline(input=fastafile_name,
                                        auto=True,
-                                       amino=True)
+                                       amino=True,
+                                       adjustdirection=True,)
         elif aligner == "clustal":
             command = ClustalOmegaCommandline(
                 infile=fastafile_name,
@@ -245,6 +247,7 @@ def get_align_dna_to_alignment_commands(bad_dna_seqs_file, codonalignment_file,
     #Note that the MAFFT command must be run with command[:-1] as it writes 
     # to STDOUT by default. Use capture STDOUT when running with subprocess    
     elif aligner == "clustal":
+        raise Exception("Clustal is unable to align a single sequence to a profile. Please use MAFFT for now.")
         command = ["clustalo",
                    "--in", bad_dna_seqs_file,
                    "--profile1", codonalignment_file,
