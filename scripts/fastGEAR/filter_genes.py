@@ -1,6 +1,7 @@
 import os
 import shutil
 
+import numpy as np
 import networkx as nx
 from Bio import SeqIO
 
@@ -41,8 +42,26 @@ def check_diversity(genelist, threshold, outdir):
     return passed
         
 
+def is_conserved(seqs, threshold):
+    # compare everything to the first sequence
+    ref = np.fromstring(str(seqs[0].seq), dtype=np.int8)
+    length = float(len(ref))
+    for seq in seqs[1:]:
+        if (
+            np.sum(np.fromstring(str(seq[1].lower()), dtype=np.int8) == ref) / length
+            < threshold
+        ):
+            return False
+    return True
         
-        
+def check_divergence(genelist, threshold, outdir):
+    passed = []
+    for gene in genelist:
+        filename = outdir + "aligned_gene_sequences/" + gene +".aln.fas"
+        seqs = list(SeqIO.parse(filename, 'fasta'))
+        if is_conserved(seqs, threshold):
+            passed.append(gene)
+    return passed
 
 
 if __name__ == '__main__':
@@ -69,12 +88,20 @@ if __name__ == '__main__':
                              discarded from core""",
                         default=0.7)
     
+    # parser.add_argument("-d",
+    #                     "--distance-threshold",
+    #                     dest="dist",
+    #                     help="""Average pairwise distance threshold 
+    #                     [snps/length] at which genes are discarded from core""",
+    #                     default = 0.05)
+    
     parser.add_argument("-d",
-                        "--distance-threshold",
+                        "--divergence-threshold",
                         dest="dist",
-                        help="""Average pairwise distance threshold 
-                        [snps/length] at which genes are discarded from core""",
-                        default = 0.05)
+                        help="""Max. Pairwise distance threshold 
+                         between seqs. at which genes are discarded from core""",
+                        default = 0.9)
+    
     parser.add_argument("--copy",
                        dest="copy",
                        help="Flag to copy filter-passing genes to new directory",
@@ -105,7 +132,9 @@ if __name__ == '__main__':
     #check gapppedness
     passed_gaps = check_gappedness(core_names, args.gap, args.output_dir)
     #check distance
-    passed_distance = check_diversity(passed_gaps, args.dist, args.output_dir)
+    #passed_distance = check_diversity(passed_gaps, args.dist, args.output_dir)
+    #check divergence
+    passed_distance = check_divergence(passed_gaps, args.dist, args.output_dir)
     #output filtered core genome
     concatenate_core_genome_alignments(args.output_dir + 'aligned_gene_sequences/',
                                        passed_distance, args.output_dir, 
