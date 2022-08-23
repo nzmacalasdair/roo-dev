@@ -115,7 +115,11 @@ if __name__ == '__main__':
                         dest="prefiltered",
                         default=None,
                         help="""Provide a folder in the panaroo output 
-                        containing a filtered set of core genes""")    
+                        containing a filtered set of core genes""")
+    parser.add_argument("--prefix",
+                        dest="prefix",
+                        default="filtered_core_gene",
+                        help="Provide outprefix")
     args = parser.parse_args()
     
     # make sure trailing forward slash is present
@@ -136,7 +140,7 @@ if __name__ == '__main__':
         files = os.listdir(args.prefiltered)
         filt_names = [x.split('.')[0] for x in files]
         concatenate_core_genome_alignments(args.prefiltered, 
-                                           filt_names, args.output_dir, "filtered_core_gene")
+                                           filt_names, args.output_dir, args.prefix)
         
     else:
         #load graph
