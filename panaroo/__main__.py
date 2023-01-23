@@ -223,11 +223,25 @@ Does not delete any genes and only performes merge and refinding\
         type=str,
         choices=['prank', 'clustal', 'mafft'],
         default="mafft")
+    core.add_argument(
+        "--codons",
+        dest="codons",
+        help=
+        "Generate codon alignments by aligning sequences at the protein level",
+        action='store_true',
+        default=False)
     core.add_argument("--core_threshold",
                       dest="core",
                       help="Core-genome sample threshold (default=0.95)",
                       type=float,
                       default=0.95)
+    core.add_argument("--core_entropy_filter",
+                      dest="hc_threshold",
+                      help=("Manually set the Block Mapping and Gathering with " +
+                            "Entropy (BMGE) filter. Can be between 0.0 and 1.0. By " + 
+                            "default this is set using the Tukey outlier method."),
+                      type=float,
+                      default=None)
 
     # Other options
     parser.add_argument("-t",
@@ -487,15 +501,16 @@ def main():
     if args.aln == "pan":
         if args.verbose: print("generating pan genome MSAs...")
         generate_pan_genome_alignment(G, temp_dir, args.output_dir, args.n_cpu,
-                                      args.alr, isolate_names)
+                                      args.alr, args.codons, isolate_names)
         core_nodes = get_core_gene_nodes(G, args.core, len(args.input_files))
         core_names = [G.nodes[x]["name"] for x in core_nodes]
-        concatenate_core_genome_alignments(core_names, args.output_dir)
+        concatenate_core_genome_alignments(core_names, args.output_dir, args.hc_threshold)
     elif args.aln == "core":
         if args.verbose: print("generating core genome MSAs...")
         generate_core_genome_alignment(G, temp_dir, args.output_dir,
                                        args.n_cpu, args.alr, isolate_names,
-                                       args.core, len(args.input_files))
+                                       args.core, args.codons, len(args.input_files),
+                                       args.hc_threshold)
 
     # remove temporary directory
     shutil.rmtree(temp_dir)
