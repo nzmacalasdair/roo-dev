@@ -80,7 +80,7 @@ def analyse_pair_frequentist(ordered_diffs, ordered_lengths, ordered_genes):
     
     for cutoff in range(len(ordered_diffs), 0, -1):
         pvalue = 1 - stats.binom.cdf(max(ordered_diffs[cutoff-1], 0), 
-                                     ordered_lengths[cutoff],
+                                     ordered_lengths[cutoff-1],
                                      average_proportion)
         multtest_alpha = 0.05/len(ordered_diffs)
         if pvalue < multtest_alpha:

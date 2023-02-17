@@ -15,11 +15,8 @@ from read_panout import write_rm_estimate
 
 from recomb_model_functions import *
 
-
-if __name__ == "__main__":
-    import argparse
+def main():
     #Get arguments, output directory w/ aligned pangenome, and bayesian/frequentist
-    
     parser = argparse.ArgumentParser(
         "Identify and remove recombinant gene sequences from core or pan alignment"
     )
@@ -74,9 +71,9 @@ if __name__ == "__main__":
     elif args.method == "frequentist":
         
         for pair in ordered_pairs:
-            proportions = ordered_pairs[pair][0]
-            dists = proportions[:,0]
-            lens = proportions[:,1]
+            pair_proportions = ordered_pairs[pair][0]
+            dists = pair_proportions[:,0]
+            lens = pair_proportions[:,1]
             
             genes = ordered_pairs[pair][1]
             
@@ -140,6 +137,14 @@ if __name__ == "__main__":
                  rmregression.intercept + rmregression.slope*range(len(pairwise)), 
                  'r', label='fitted line')
         plt.savefig(args.outdir + "collection_rm_estimate_regression.png")
+
+
+if __name__ == "__main__":
+    import argparse
+    main()
+    
+    
+    
     
     
     
