@@ -9,13 +9,14 @@ from scipy import stats
 import networkx as nx
 from Bio import SeqIO
 
-from read_panout import parse_pangenome 
-from read_panout import remove_recombinant_seqs
-from read_panout import write_rm_estimate
+from scripts.remove_recombination.read_panout import parse_pangenome 
+from scripts.remove_recombination.read_panout import remove_recombinant_seqs
+from scripts.remove_recombination.read_panout import write_rm_estimate
 
-from recomb_model_functions import *
+from scripts.remove_recombination.recomb_model_functions import *
 
 def main():
+    import argparse
     #Get arguments, output directory w/ aligned pangenome, and bayesian/frequentist
     parser = argparse.ArgumentParser(
         "Identify and remove recombinant gene sequences from core or pan alignment"
@@ -48,6 +49,8 @@ def main():
     #Set up some empty dics for results
     gene_recombination_dic = {}
     relative_cleaned_dists = {}
+    cleaned_dists = {}
+    total_dists = {}
     proportions = {}
     #Do analysis, either bayesian or frequentist to identify recomb. gene pairs
     if args.method == "bayesian":
@@ -63,6 +66,11 @@ def main():
             for gene in recombinants:
                     gene_recombination_dic[gene] = gene_recombination_dic.get(gene,
                                                                           []) + [pair]
+            
+            total_dist = sum(ordered_pairs[pair][0][:,0])
+            cleaned_dist = total_dist - sum(ordered_pairs[pair][0][:threshold,0])
+            total_dists[pair] = total_dist
+            cleaned_dists[pair] = cleaned_dist
             proportion_distance = ordered_pairs[pair][0][:,0]/ordered_pairs[pair][0][:,1]
             proportions[pair] = proportion_distance
             relative_distance = np.mean(proportion_distance)/mean_distance
@@ -79,11 +87,17 @@ def main():
             
             threshold, recombinants = analyse_pair_frequentist(dists, lens, genes)
             
+            mean_distance = sum(dists[:threshold]) / sum(lens[:threshold])
+            
             genes = ordered_pairs[pair][1]
             
             for gene in recombinants:
                 gene_recombination_dic[gene] = gene_recombination_dic.get(gene,
                                                                           []) + [pair]
+            total_dist = sum(ordered_pairs[pair][0][:,0])
+            cleaned_dist = total_dist - sum(ordered_pairs[pair][0][threshold:,0])
+            total_dists[pair] = total_dist
+            cleand_dists[pair] = cleaned_dist
             proportion_distance = ordered_pairs[pair][0][:,0]/ordered_pairs[pair][0][:,1]
             proportions[pair] = proportion_distance
             relative_distance = np.mean(proportion_distance)/mean_distance
@@ -101,10 +115,11 @@ def main():
             for recombinant_pair in gene_recombination_dic[gene]:
                 recombination_list = recombinant_pair.split("-")
                 gene_network.add_edge(*recombination_list)
-            if len(gene_network.nodes) > 5:
+            if len(gene_network.nodes) > 4:
                 to_remove = []
+                min_degree = min([x[1] for x in gene_network.degree])
                 for gene_degree in gene_network.degree:
-                    if gene_degree[1] > 1:
+                    if gene_degree[1] > min_degree:
                         to_remove.append(gene_degree[0])
             else:
                 to_remove = list(gene_network.nodes)
@@ -140,7 +155,6 @@ def main():
 
 
 if __name__ == "__main__":
-    import argparse
     main()
     
     

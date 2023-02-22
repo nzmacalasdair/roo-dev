@@ -93,7 +93,7 @@ def analyse_pair_frequentist(ordered_diffs, ordered_lengths, ordered_genes):
     return (threshold, recombinant_genes)
     
 
-def estimate_collection_rm(proportion_dictionary):
+def estimate_collection_rm(cleaned_dists, uncleaned_dists):
     raw_proportions = np.array(sorted(list(proportion_dictionary.values())))
     
     tenth_percentile = np.percentile(raw_proportions, 10)
