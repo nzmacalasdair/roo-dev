@@ -4,6 +4,7 @@ import numpy as np
 
 import scipy.special as sp
 from scipy import stats
+from scipy import optimize
 
 #This module contains all the functions required to identify recombinant pairs.
 #genes, and estimate r/m for the collection
@@ -94,17 +95,16 @@ def analyse_pair_frequentist(ordered_diffs, ordered_lengths, ordered_genes):
     
 
 def estimate_collection_rm(cleaned_dists, uncleaned_dists):
-    raw_proportions = np.array(sorted(list(proportion_dictionary.values())))
+    flat_cleaned = []
+    flat_uncleaned = []
     
-    tenth_percentile = np.percentile(raw_proportions, 10)
-    nintieth_percentile = np.percentile(raw_proportions, 90)
+    for x in cleaned_dists:
+        flat_cleaned.append(cleaned_dists[x])
+        flat_uncleaned.append(uncleaned_dists[x])  
     
-    middle_80 = [(tenth_percentile < raw_proportions) & 
-                 (raw_proportions < nintieth_percentile)][0]
+    regression, stderr = optimize.curve_fit(lambda x, m: m*x, flat_cleaned, 
+                                            flat_uncleaned)
     
-    xaxis = range(len(raw_proportions[middle_80]))
-    regression = stats.linregress(xaxis,raw_proportions[middle_80])
-    
-    return(regression, raw_proportions[middle_80], xaxis)
+    return(regression[0], stderr[0], (flat_cleaned, flat_uncleaned))
     
         

@@ -35,6 +35,11 @@ def main():
                         action="store_true",
                         help="""Plot fitted regression used to estimate 
                         collection's r/m""")
+    parser.add_argument("--core_threshold",
+                        dest="core",
+                        help="Core-genome sample threshold, recombination free (default=0.95)",
+                        type=float,
+                        default=0.95)
     args = parser.parse_args()
     
     #Make sure formatting is correct for panaroo dir, and create new out dir
@@ -48,10 +53,11 @@ def main():
     ordered_pairs = order_pairwise_diffs(pairwise_differences)
     #Set up some empty dics for results
     gene_recombination_dic = {}
-    relative_cleaned_dists = {}
+    pairwise_rm_estimates = {}
     cleaned_dists = {}
     total_dists = {}
-    proportions = {}
+
+
     #Do analysis, either bayesian or frequentist to identify recomb. gene pairs
     if args.method == "bayesian":
     
@@ -66,15 +72,14 @@ def main():
             for gene in recombinants:
                     gene_recombination_dic[gene] = gene_recombination_dic.get(gene,
                                                                           []) + [pair]
-            
+            expec_pg_muts = mean_distance * sum(ordered_pairs[pair][0][:,1])
             total_dist = sum(ordered_pairs[pair][0][:,0])
-            cleaned_dist = total_dist - sum(ordered_pairs[pair][0][:threshold,0])
+            rec_mutations = total_dist - expec_pg_muts
             total_dists[pair] = total_dist
+            cleaned_dist = total_dist - rec_mutations
             cleaned_dists[pair] = cleaned_dist
-            proportion_distance = ordered_pairs[pair][0][:,0]/ordered_pairs[pair][0][:,1]
-            proportions[pair] = proportion_distance
-            relative_distance = np.mean(proportion_distance)/mean_distance
-            relative_cleaned_dists[pair] = relative_distance
+            pairwise_rm_estimates[pair] = rec_mutations/cleaned_dist
+
     
     elif args.method == "frequentist":
         
@@ -94,14 +99,14 @@ def main():
             for gene in recombinants:
                 gene_recombination_dic[gene] = gene_recombination_dic.get(gene,
                                                                           []) + [pair]
+            expec_pg_muts = mean_distance * sum(ordered_pairs[pair][0][:,1])
             total_dist = sum(ordered_pairs[pair][0][:,0])
-            cleaned_dist = total_dist - sum(ordered_pairs[pair][0][threshold:,0])
+            rec_mutations = total_dist - expec_pg_muts
             total_dists[pair] = total_dist
-            cleand_dists[pair] = cleaned_dist
-            proportion_distance = ordered_pairs[pair][0][:,0]/ordered_pairs[pair][0][:,1]
-            proportions[pair] = proportion_distance
-            relative_distance = np.mean(proportion_distance)/mean_distance
-            relative_cleaned_dists[pair] = relative_distance
+            cleaned_dist = total_dist - rec_mutations
+            cleaned_dists[pair] = cleaned_dist
+            pairwise_rm_estimates[pair] = rec_mutations/cleaned_dist
+
     else:
         raise ValueError("Method must be one of [bayesian, frequentist]")
     
@@ -129,27 +134,29 @@ def main():
     #Remove recombinant sequences and write new alignments to file
     remove_recombinant_seqs(actual_recombinants_to_remove, args.outdir)
     #Write new core genome alignment
+    G = nx.read_gml(args.outdir + "final_graph.gml")
+    with open(args.outfir + "gene_presence_absenece.Rtab", 'r') as inhandle:
+        header = inhandle.readline()
+    isolate_no = len(header.split()) - 1
+    core_nodes = get_core_gene_nodes(G, isolate_no, args.core)
+    concatenate_core_genome_alignments(core_nodes, args.outdir)
     
-    #Take all the pairwise r/m estimates to estimate r/m for the collection
-    #Use only the middle 80 percent of data (exclude >90th and <10th)
-    mean_proportions = {}
-    for pair in proportions:
-        mean_proportions[pair] = np.mean(proportions[pair])
+    #Estimate the collection r/m by pooling rations and estimating the slope
     
-    rmregression, pairwise, xaxis = estimate_collection_rm(mean_proportions)
+    rm, stderr, dist_lists = estimate_collection_rm(mean_proportions)
     
-    print("Estimated r/m for collection: %s" %rmregression.slope)
+    print("Estimated r/m for collection: %s" %rm)
     
-    write_rm_estimate(rmregression, args.outdir)
+    write_rm_estimate((rm, stderr), args.outdir)
     
     if args.plot_rm == True:
         import matplotlib
         import matplotlib.pyplot as plt
         plt.style.use('ggplot')
         
-        plt.scatter(range(len(pairwise)), pairwise)
-        plt.plot(range(len(pairwise)), 
-                 rmregression.intercept + rmregression.slope*range(len(pairwise)), 
+        plt.scatter(dist_lists[0], dist_lists[1])
+        plt.plot(np.arange(max(dist_lists[0])), 
+                 rm*np.arange(max(dist_lists[0])), 
                  'r', label='fitted line')
         plt.savefig(args.outdir + "collection_rm_estimate_regression.png")
 
