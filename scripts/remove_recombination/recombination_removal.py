@@ -135,7 +135,7 @@ def main():
     remove_recombinant_seqs(actual_recombinants_to_remove, args.outdir)
     #Write new core genome alignment
     G = nx.read_gml(args.outdir + "final_graph.gml")
-    with open(args.outfir + "gene_presence_absenece.Rtab", 'r') as inhandle:
+    with open(args.outdir + "gene_presence_absenece.Rtab", 'r') as inhandle:
         header = inhandle.readline()
     isolate_no = len(header.split()) - 1
     core_nodes = get_core_gene_nodes(G, isolate_no, args.core)
