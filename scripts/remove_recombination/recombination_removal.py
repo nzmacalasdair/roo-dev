@@ -146,7 +146,7 @@ def main():
     
     #Estimate the collection r/m by pooling rations and estimating the slope
     
-    rm, stderr, dist_lists = estimate_collection_rm(mean_proportions)
+    rm, stderr, dist_lists = estimate_collection_rm(cleaned_dists, total_dists)
     
     print("Estimated r/m for collection: %s" %rm)
     
