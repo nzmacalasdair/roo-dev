@@ -142,7 +142,8 @@ def main():
         header = inhandle.readline()
     isolate_no = len(header.split()) - 1
     core_nodes = get_core_gene_nodes(G, isolate_no, args.core)
-    concatenate_core_genome_alignments(core_nodes, args.outdir)
+    core_names = [G.nodes[x]["name"] for x in core_nodes]
+    concatenate_core_genome_alignments(core_names, args.outdir)
     
     #Estimate the collection r/m by pooling rations and estimating the slope
     
