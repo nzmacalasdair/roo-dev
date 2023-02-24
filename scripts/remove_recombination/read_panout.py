@@ -93,7 +93,7 @@ def parse_pangenome(output_dir):
         lines = inhandle.read().splitlines()
     hc_vals = [x.split(",") for x in lines]
     
-    allh = np.array([gene[1] for gene in hc_vals])
+    allh = np.array([float(gene[1]) for gene in hc_vals])
     q = np.quantile(allh, [0.25,0.75])
     hc_threshold = max(0.01, q[1] + 1.5*(q[1]-q[0]))
     print(f"Entropy threshold automatically set to {hc_threshold}.")
