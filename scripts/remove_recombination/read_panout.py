@@ -99,7 +99,7 @@ def parse_pangenome(output_dir):
     print(f"Entropy threshold automatically set to {hc_threshold}.")
     
     for gene in hc_vals:
-        if gene[1] > hc_threshold:
+        if float(gene[1]) > hc_threshold:
             name = gene[0].split(".")[0]
             genes.remove(name)
     
