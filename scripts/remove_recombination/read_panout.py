@@ -45,11 +45,16 @@ def get_pairs(isolate_list):
     pairs_list = [(isolate_list[i], isolate_list[j]) for i in range(len(isolate_list)) for j in range(i+1,len(isolate_list))]
     return pairs_list
 
-def get_all_pairwise_diffs(pairs, alignment_directory):
+def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory):
     pair_diff_len_distributions = {}
     alignment_names = os.listdir(alignment_directory)
+    filtered_alignment_names = []
+    for file in alignment_names:
+        name = file.split(".")[0]
+        if name in filt_genes:
+            filtered_alignment_names.append(file)
     alignments = []
-    for alignment in alignment_names:
+    for alignment in filtered_alignment_names:
         alignfile = alignment_directory + alignment
         sequences = list(SeqIO.parse(alignfile, 'fasta'))
         alignments.append((sequences, alignment))
@@ -57,7 +62,7 @@ def get_all_pairwise_diffs(pairs, alignment_directory):
     for pair in pairs:
         pairid = "-".join(pair)
         pair_diff_len_distributions[pairid] = get_pangenome_pairwise_differences(alignments, pair)
-    return pair_diff_len_distributions
+    return [x.split(".")[0] for x in filtered_alignment_names], pair_diff_len_distributions
 
 def parse_pangenome(output_dir):
     if output_dir[-1] != "/":
@@ -79,12 +84,28 @@ def parse_pangenome(output_dir):
         gene_alignments_dir = output_dir + "aligned_gene_sequences/"
     if not os.path.isdir(gene_alignments_dir):
         raise ValueError("aligned_gene_sequences directory is missing!")
+        
     gene_alignment_files = os.listdir(gene_alignments_dir)
     genes = [x.split(".")[0] for x in gene_alignment_files]
     
+    #Filter genes based on entropy scores
+    with open(output_dir + "gene_hc_vals.csv", 'r') as inhandle:
+        lines = inhandle.read().splitlines()
+    hc_vals = [x.split(",") for x in lines]
+    
+    allh = np.array([gene[1] for gene in hc_vals])
+    q = np.quantile(allh, [0.25,0.75])
+    hc_threshold = max(0.01, q[1] + 1.5*(q[1]-q[0]))
+    print(f"Entropy threshold automatically set to {hc_threshold}.")
+    
+    for gene in hc_vals:
+        if gene[1] > hc_threshold:
+            name = gene[0].split(".")[0]
+            genes.remove(name)
+    
     #Get all the distributions of pairwise differences
     
-    pairwise_differences = get_all_pairwise_diffs(pairs, gene_alignments_dir)
+    ordered_genes, pairwise_differences = get_all_pairwise_diffs(pairs, genes, gene_alignments_dir)
 
     return(genes, pairwise_differences)
 
