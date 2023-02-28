@@ -121,6 +121,8 @@ def parse_pangenome(output_dir, threads):
         if float(gene[1]) > hc_threshold:
             name = gene[0].split(".")[0]
             genes.remove(name)
+    #Filter for genes present in >2 isolates:    
+    genes = [x for x in genes if ".fas.aln" in x]
     
     #Get all the distributions of pairwise differences
     
