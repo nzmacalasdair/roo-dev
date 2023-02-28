@@ -2,10 +2,11 @@ import os
 import math
 import decimal
 
+from joblib import Parallel, delayed
+
 import numpy as np
 from scipy import sparse
 from scipy import stats
-
 import networkx as nx
 from Bio import SeqIO
 
@@ -43,6 +44,12 @@ def main():
                         help="Core-genome sample threshold, recombination free (default=0.95)",
                         type=float,
                         default=0.95)
+    parser.add_argument("-t",
+                        "--threads",
+                        dest="n_cpu",
+                        help="number of threads to use (default=1)",
+                        type=int,
+                        default=1)
     args = parser.parse_args()
     
     #Make sure formatting is correct for panaroo dir, and create new out dir
@@ -51,7 +58,7 @@ def main():
         os.mkdir(args.outdir + "recombination_free_aligned_genes/")
 
     #Load in relevant info from genes
-    gene_names, pairwise_differences = parse_pangenome(args.outdir)
+    gene_names, pairwise_differences = parse_pangenome(args.outdir, args.n_cpu)
     #Order genes from least snps/length to greatest snps/length
     ordered_pairs = order_pairwise_diffs(pairwise_differences)
     #Set up some empty dics for results
@@ -63,13 +70,14 @@ def main():
 
     #Do analysis, either bayesian or frequentist to identify recomb. gene pairs
     if args.method == "bayesian":
-    
+        #model_probabilities, mean_distance = Parallel
+        ##legacy single-threaded code 
         for pair in ordered_pairs:
             model_probabilities, mean_distance = analyse_pair(ordered_pairs[pair][0][:,0], 
                                                         ordered_pairs[pair][0][:,1])
             
             threshold, recombinants = find_threshold(model_probabilities, 
-                                                     ordered_pairs[pair][1])
+                                                      ordered_pairs[pair][1])
             
             genes = ordered_pairs[pair][1]
             for gene in recombinants:

@@ -1,5 +1,6 @@
 import os
 
+from joblib import Parallel, delayed
 
 import numpy as np
 
@@ -45,7 +46,7 @@ def get_pairs(isolate_list):
     pairs_list = [(isolate_list[i], isolate_list[j]) for i in range(len(isolate_list)) for j in range(i+1,len(isolate_list))]
     return pairs_list
 
-def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory):
+def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads):
     pair_diff_len_distributions = {}
     alignment_names = os.listdir(alignment_directory)
     filtered_alignment_names = []
@@ -53,18 +54,36 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory):
         name = file.split(".")[0]
         if name in filt_genes:
             filtered_alignment_names.append(file)
-    alignments = []
-    for alignment in filtered_alignment_names:
-        alignfile = alignment_directory + alignment
-        sequences = list(SeqIO.parse(alignfile, 'fasta'))
-        alignments.append((sequences, alignment))
-        
-    for pair in pairs:
-        pairid = "-".join(pair)
-        pair_diff_len_distributions[pairid] = get_pangenome_pairwise_differences(alignments, pair)
+    sequences = Parallel(n_jobs=threads, prefer="threads")(
+        delayed(SeqIO.parse)(x, 'fasta') for x in filtered_alignment_names)
+    sequences = [list(x) for x in sequences]
+    
+    alignments = [(sequences[x], 
+                   filtered_alignment_names[x]) for x in range(len(sequences))]
+    ##Legacy single-threaded code
+    # alignments = []
+    # for alignment in filtered_alignment_names:
+    #     alignfile = alignment_directory + alignment
+    #     sequences = list(SeqIO.parse(alignfile, 'fasta'))
+    #     alignments.append((sequences, alignment))
+    #    
+    #for pair in pairs:
+    #    pairid = "-".join(pair)
+    #    pair_diff_len_distributions[pairid] = get_pangenome_pairwise_differences(alignments, pair)
+    
+    
+    diffs_lens = Parallel(n_jobs=threads, prefer="threads")(
+        delayed(get_pangenome_pairwise_differences)(pair, alignments)
+        for pair in pairs)
+    
+    pairids = ["-".join(x) for x in pairs]
+    pair_diff_len_distributions = {}
+    for index in range(len(pairs)):
+        pair_diff_len_distributions[pairids[index]] = diffs_lens[index]
+    
     return [x.split(".")[0] for x in filtered_alignment_names], pair_diff_len_distributions
 
-def parse_pangenome(output_dir):
+def parse_pangenome(output_dir, threads):
     if output_dir[-1] != "/":
         output_dir += "/"
     #Get all the pairwise comparison combinations
@@ -105,7 +124,8 @@ def parse_pangenome(output_dir):
     
     #Get all the distributions of pairwise differences
     
-    ordered_genes, pairwise_differences = get_all_pairwise_diffs(pairs, genes, gene_alignments_dir)
+    ordered_genes, pairwise_differences = get_all_pairwise_diffs(pairs, genes, 
+                                                gene_alignments_dir, threads)
 
     return(genes, pairwise_differences)
 
