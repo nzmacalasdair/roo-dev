@@ -54,8 +54,10 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads):
         name = file.split(".")[0]
         if name in filt_genes:
             filtered_alignment_names.append(file)
+    
+    filtered_alignment_paths = [alignment_directory + x for x in filtered_alignment_names]
     sequences = Parallel(n_jobs=threads, prefer="threads")(
-        delayed(SeqIO.parse)(x, 'fasta') for x in filtered_alignment_names)
+        delayed(SeqIO.parse)(x, 'fasta') for x in filtered_alignment_paths)
     sequences = [list(x) for x in sequences]
     
     alignments = [(sequences[x], 
@@ -105,6 +107,9 @@ def parse_pangenome(output_dir, threads):
         raise ValueError("aligned_gene_sequences directory is missing!")
         
     gene_alignment_files = os.listdir(gene_alignments_dir)
+    #Filter for genes present in >2 isolates    
+    gene_alignment_files = [x for x in gene_alignment_files if ".aln.fas" in x]
+    
     genes = [x.split(".")[0] for x in gene_alignment_files]
     
     #Filter genes based on entropy scores
@@ -120,9 +125,8 @@ def parse_pangenome(output_dir, threads):
     for gene in hc_vals:
         if float(gene[1]) > hc_threshold:
             name = gene[0].split(".")[0]
-            genes.remove(name)
-    #Filter for genes present in >2 isolates    
-    genes = [x for x in genes if ".fas.aln" in x]
+            if name in genes:
+                genes.remove(name)
     
     #Get all the distributions of pairwise differences
     
