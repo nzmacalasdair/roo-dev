@@ -89,7 +89,7 @@ def parse_pangenome(output_dir):
     genes = [x.split(".")[0] for x in gene_alignment_files]
     
     #Filter genes based on entropy scores
-    with open(output_dir + "gene_hc_vals.csv", 'r') as inhandle:
+    with open(output_dir + "alignment_entropy.csv", 'r') as inhandle:
         lines = inhandle.read().splitlines()
     hc_vals = [x.split(",") for x in lines]
     
