@@ -75,7 +75,7 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads):
     
     
     diffs_lens = Parallel(n_jobs=threads, prefer="threads")(
-        delayed(get_pangenome_pairwise_differences)(pair, alignments)
+        delayed(get_pangenome_pairwise_differences)(alignments, pair)
         for pair in pairs)
     
     pairids = ["-".join(x) for x in pairs]
