@@ -19,6 +19,7 @@ from scripts.remove_recombination.read_panout import write_alignment_header
 
 from scripts.remove_recombination.recomb_model_functions import *
 
+
 def main():
     import argparse
     #Get arguments, output directory w/ aligned pangenome, and bayesian/frequentist
