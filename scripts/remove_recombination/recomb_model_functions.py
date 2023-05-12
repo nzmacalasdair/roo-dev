@@ -106,5 +106,38 @@ def estimate_collection_rm(cleaned_dists, uncleaned_dists):
                                             flat_uncleaned)
     
     return(regression[0], stderr[0], (flat_cleaned, flat_uncleaned))
+
+def recombination_analysis_bayesian(pair):
+    #wrapper to help keep recombination_removal neat
+    model_probabilities, mean_distance = analyse_pair(pair[0][:,0], 
+                                                pair[0][:,1])
+            
+    threshold, recombinants = find_threshold(model_probabilities, pair[1])
+            
     
-        
+    expec_pg_muts = mean_distance * sum(pair[0][:,1])
+    total_dist = sum(pair[0][:,0])
+    
+    rec_mutations = total_dist - expec_pg_muts
+    cleaned_dist = total_dist - rec_mutations
+    
+    return (recombinants, [total_dist, cleaned_dist, rec_mutations])
+
+def recombination_analysis_frequentist(pair):
+    #wrapper to help keep main script tidy
+    pair_proportions = pair[0]
+    dists = pair_proportions[:,0]
+    lens = pair_proportions[:,1]
+    
+    genes = pair[1]
+    
+    threshold, recombinants = analyse_pair_frequentist(dists, lens, genes)
+    
+    mean_distance = sum(dists[:threshold]) / sum(lens[:threshold])
+    
+    expec_pg_muts = mean_distance * sum(pair[0][:,1])
+    total_dist = sum(pair[0][:,0])
+    rec_mutations = total_dist - expec_pg_muts
+    cleaned_dist = total_dist - rec_mutations
+    
+    return(recombinants, [total_dist, cleaned_dist, rec_mutations])

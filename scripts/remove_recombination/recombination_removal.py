@@ -58,6 +58,10 @@ def main():
     if not os.path.isdir(args.outdir + "recombination_free_aligned_genes/"):
         os.mkdir(args.outdir + "recombination_free_aligned_genes/")
 
+    #Check to make sure args.method is accurate
+    if args.method not in ["bayesian", "frequentist"]:
+        raise ValueError("Method must be one of [bayesian, frequentist]")
+        
     #Load in relevant info from genes
     gene_names, pairwise_differences = parse_pangenome(args.outdir, args.n_cpu)
     #Order genes from least snps/length to greatest snps/length
@@ -68,64 +72,31 @@ def main():
     cleaned_dists = {}
     total_dists = {}
 
-
     #Do analysis, either bayesian or frequentist to identify recomb. gene pairs
-    if args.method == "bayesian":
-        #model_probabilities, mean_distance = Parallel
-        ##legacy single-threaded code 
-        for pair in ordered_pairs:
-            model_probabilities, mean_distance = analyse_pair(ordered_pairs[pair][0][:,0], 
-                                                        ordered_pairs[pair][0][:,1])
-            
-            threshold, recombinants = find_threshold(model_probabilities, 
-                                                      ordered_pairs[pair][1])
-            
-            genes = ordered_pairs[pair][1]
-            for gene in recombinants:
-                    gene_recombination_dic[gene] = gene_recombination_dic.get(gene,
-                                                                          []) + [pair]
-            expec_pg_muts = mean_distance * sum(ordered_pairs[pair][0][:,1])
-            total_dist = sum(ordered_pairs[pair][0][:,0])
-            rec_mutations = total_dist - expec_pg_muts
-            total_dists[pair] = total_dist
-            cleaned_dist = total_dist - rec_mutations
-            cleaned_dists[pair] = cleaned_dist
-            pairwise_rm_estimates[pair] = rec_mutations/cleaned_dist
-
     
-    elif args.method == "frequentist":
-        
-        for pair in ordered_pairs:
-            pair_proportions = ordered_pairs[pair][0]
-            dists = pair_proportions[:,0]
-            lens = pair_proportions[:,1]
-            
-            genes = ordered_pairs[pair][1]
-            
-            threshold, recombinants = analyse_pair_frequentist(dists, lens, genes)
-            
-            mean_distance = sum(dists[:threshold]) / sum(lens[:threshold])
-            
-            genes = ordered_pairs[pair][1]
-            
-            for gene in recombinants:
+    #model_probabilities, mean_distance = Parallel
+    ##single-threaded code, for now
+    
+    for pair in ordered_pairs:
+        if args.method == "bayesian":
+            recombinants, dists = recombination_analysis_bayesian(ordered_pairs[pair])
+            print(recombinants)
+            print(dists)
+        elif args.method == "frequentist":
+            recombinants, dists = recombination_analysis_frequentist(ordered_pairs[pair])            
+            print(recombinants)
+            print(dists)
+        for gene in recombinants:
                 gene_recombination_dic[gene] = gene_recombination_dic.get(gene,
-                                                                          []) + [pair]
-            expec_pg_muts = mean_distance * sum(ordered_pairs[pair][0][:,1])
-            total_dist = sum(ordered_pairs[pair][0][:,0])
-            rec_mutations = total_dist - expec_pg_muts
-            total_dists[pair] = total_dist
-            cleaned_dist = total_dist - rec_mutations
-            cleaned_dists[pair] = cleaned_dist
-            pairwise_rm_estimates[pair] = rec_mutations/cleaned_dist
-
-    else:
-        raise ValueError("Method must be one of [bayesian, frequentist]")
-    
+                                                                      []) + [pair]
+        total_dists[pair] = dists[0]
+        cleaned_dists[pair] = dists[1]
+        pairwise_rm_estimates = dists[2]/dists[1]
+  
     #Reduce recombinant pairs to only isolates where recombination is present
     #Do this by making a network and taking only isolates of degree > 2
     actual_recombinants_to_remove = {}
-
+    print(gene_recombination_dic)
     for gene in gene_recombination_dic:
         if len(gene_recombination_dic[gene]) > 1:
             gene_network = nx.Graph()
@@ -143,6 +114,7 @@ def main():
         else:
             to_remove = gene_recombination_dic[gene][0].split("-")
         actual_recombinants_to_remove[gene] = to_remove
+    print(actual_recombinants_to_remove)
     #Remove recombinant sequences and write new alignments to file
     remove_recombinant_seqs(actual_recombinants_to_remove, args.outdir)
     #Write new core genome alignment
