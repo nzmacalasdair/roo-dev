@@ -65,32 +65,25 @@ if __name__ == '__main__':
                         dest="recombs",
                         help="""Path to a .csv containing the recombination data
                         from a fastGEAR run summarised by summarise_pgfG.py""")
-    parser.add_argument('--filtered',
-                        dest="filt",
-                        action="store_true",
-                        help="Filtered or unfiltered alignments")
     args = parser.parse_args()
 
     #prepare files, output folder    
     # make sure trailing forward slash is present
     args.output_dir = os.path.join(args.output_dir, "")
-    os.mkdir(args.output_dir + "recombination_free_aligned_genes/")
+    os.mkdir(args.output_dir + "fastGEAR_recombination_free_aligned_genes/")
     
     #read in data
-    if args.filt:
-        alignment_list = os.listdir(args.output_dir + "filtered_gene_alignments/")
-    else:        
-        alignment_list = os.listdir(args.output_dir + "aligned_gene_sequences/")
+    alignment_list = os.listdir(args.output_dir + "aligned_gene_sequences/")
     gene_recombinations = parse_recombination_file(args.recombs)
     
     #remove recombination regions from alignments
     remove_recombinations(gene_recombinations, alignment_list, args.output_dir)
     
     #Copy over genes with no recombination 
-    recomb_free_alignments = os.listdir(args.output_dir + "recombination_free_aligned_genes/")
+    recomb_free_alignments = os.listdir(args.output_dir + "fastGEAR_recombination_free_aligned_genes/")
     no_recomb_alignments = set(alignment_list) - set (recomb_free_alignments)
     
     for gene in no_recomb_alignments:
         shutil.copy(args.output_dir + "aligned_gene_sequences/" + gene, 
-                    args.output_dir + "recombination_free_aligned_genes/")
+                    args.output_dir + "fastGEAR_recombination_free_aligned_genes/")
     
