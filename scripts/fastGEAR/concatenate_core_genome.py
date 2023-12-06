@@ -45,7 +45,7 @@ def concatenate_core_genome_alignments(core_names, output_dir, output_prefix,
     isolates = set()
     for filename in core_filenames:
         gene_name = os.path.splitext(os.path.basename(filename))[0]
-        alignment = AlignIO.read(alignment_dir + filename, 'fasta')
+        alignment = AlignIO.read(alignments_dir + filename, 'fasta')
         gene_dict = {}
         for record in alignment:
             if len(gene_dict)<1:
