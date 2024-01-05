@@ -41,7 +41,7 @@ def remove_recombinations(recombinations, alignments, out_dir):
                 new_sequence = Seq(new_sequence)
                 
                 sequences[isolate_index].seq = new_sequence
-        outname = out_dir + "recombination_free_aligned_genes/" + gene +".aln.fas"
+        outname = out_dir + "fastGEAR_recombination_free_aligned_genes/" + gene +".aln.fas"
         SeqIO.write(sequences, outname, 'fasta')
     
     return True
