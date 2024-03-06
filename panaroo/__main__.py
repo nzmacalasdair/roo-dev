@@ -135,6 +135,11 @@ Does not delete any genes and only performes merge and refinding\
               "be found in order to consider it a match"),
         default=0.2,
         type=float)
+    refind.add_argument("--refind_strict",
+                          dest="only_valid_genes",
+                          help="Prevent fragmented, misassembled, or potential pseudogene sequences from being re-found.",
+                          action='store_true',
+                          default=False)
 
     graph = parser.add_argument_group('Graph correction')
 
@@ -235,6 +240,11 @@ Does not delete any genes and only performes merge and refinding\
                       help="Core-genome sample threshold (default=0.95)",
                       type=float,
                       default=0.95)
+    core.add_argument("--core_subset",
+                      dest="subset",
+                      help="Randomly subset the core genome to these many genes (default=all)",
+                      type=int,
+                      default=None)
     core.add_argument("--core_entropy_filter",
                       dest="hc_threshold",
                       help=("Manually set the Block Mapping and Gathering with " +
@@ -284,6 +294,7 @@ def main():
     args.output_dir = os.path.join(args.output_dir, "")
     # Create temporary directory
     temp_dir = os.path.join(tempfile.mkdtemp(dir=args.output_dir), "")
+    os.environ['TMPDIR'] = temp_dir
 
     # check if input is a file containing filenames
     if len(args.input_files) == 1:
@@ -390,6 +401,11 @@ def main():
                                        min_support=args.min_trailing_support,
                                        max_recursive=args.trailing_recursive)
 
+    if len(G.nodes()) < 2:
+        raise RuntimeError("Nearly all clusters have been trimmed! Try "
+            "reducing your clustering sequence identity thresholds and/or running "
+            "Panaroo in sensitive mode.")
+
     if args.verbose:
         print("refinding genes...")
 
@@ -405,6 +421,7 @@ def main():
                      prop_match=args.refind_prop_match,
                      pairwise_id_thresh=args.id,
                      merge_id_thresh=max(0.8, args.family_threshold),
+                     only_valid_genes=args.only_valid_genes,
                      n_cpu=args.n_cpu,
                      verbose=args.verbose)
 
@@ -454,7 +471,9 @@ def main():
         for line in infile:
             line = line.split(",")
             orig_ids[line[2]] = line[3]
-            ids_len_stop[line[2]] = (len(line[4]), "*" in line[4][1:-3])
+            ids_len_stop[line[2]] = (len(line[4]), 
+                                     "*" in line[4][1:-3],
+                                     is_valid_gene(line[5], line[4]))            
 
     G = generate_roary_gene_presence_absence(G,
                                              mems_to_isolates=mems_to_isolates,
@@ -467,6 +486,7 @@ def main():
     # write pan genome reference fasta file
     generate_pan_genome_reference(G,
                                   output_dir=args.output_dir,
+                                  ids_len_stop=ids_len_stop,
                                   split_paralogs=False)
 
     # write out common structural differences in a matrix format
@@ -512,7 +532,7 @@ def main():
         generate_core_genome_alignment(G, temp_dir, args.output_dir,
                                        args.n_cpu, args.alr, isolate_names,
                                        args.core, args.codons, len(args.input_files),
-                                       args.hc_threshold)
+                                       args.hc_threshold, args.subset)
 
     # remove temporary directory
     shutil.rmtree(temp_dir)

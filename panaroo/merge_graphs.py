@@ -238,6 +238,16 @@ def simple_merge_graphs(graphs, clusters):
                                           multi_centroid=True,
                                           check_merge_mems=True)
 
+    # Update paralog classification
+    centroid_paralog_class = Counter()
+    for node in merged_G.nodes():
+        for centroid in merged_G.nodes[node]['centroid']:
+            centroid_paralog_class[centroid] += 1
+    for node in merged_G.nodes():
+        for centroid in merged_G.nodes[node]['centroid']:
+            if centroid_paralog_class[centroid]>1:
+                merged_G.nodes[node]['paralog'] = True
+
     return merged_G
 
 
@@ -253,7 +263,9 @@ def merge_graphs(directories,
                  aln,
                  alr,
                  core,
+                 codons,
                  hc_threshold,
+                 subset=None,
                  merge_single=False,
                  depths=[1,2,3],
                  n_cpu=1,
@@ -318,6 +330,10 @@ def merge_graphs(directories,
         depths=depths,
         search_genome_ids=search_genome_ids)[0]
 
+    # if requested merge paralogs
+    if merge_para:
+        G = merge_paralogs(G)
+
     if not quiet:
         print("Number of nodes in merged graph: ", G.number_of_nodes())
 
@@ -329,27 +345,28 @@ def merge_graphs(directories,
     for i, iso in enumerate(isolate_names):
         mems_to_isolates[i] = iso
 
-    # if requested merge paralogs
-    if merge_para:
-        G = merge_paralogs(G)
-
     if not quiet:
         print("writing output...")
 
     # write out roary like gene_presence_absence.csv
     # get original annotaiton IDs, lengths and whether or
     # not an internal stop codon is present
+    # Write out merged gene_data.csv
     orig_ids = {}
     ids_len_stop = {}
-    for i, d in enumerate(directories):
-        with open(d + "gene_data.csv", 'r') as infile:
-            next(infile)
-            for line in infile:
-                line = line.split(",")
-                if line[2] not in id_mapping[i]: continue  #its been filtered
-                orig_ids[id_mapping[i][line[2]]] = line[3]
-                ids_len_stop[id_mapping[i][line[2]]] = (len(line[4]),
-                                                        "*" in line[4][1:-3])
+    with open(output_dir + "gene_data.csv", 'w') as outfile:
+        for i, d in enumerate(directories):
+            with open(d + "gene_data.csv", 'r') as infile:
+                next(infile)
+                for line in infile:    
+                    line = line.strip().split(",")
+                    if line[2] not in id_mapping[i]: continue  #its been filtered
+                    orig_ids[id_mapping[i][line[2]]] = line[3]
+                    ids_len_stop[id_mapping[i][line[2]]] = (len(line[4]),
+                                                            "*" in line[4][1:-3],
+                                                            is_valid_gene(line[5], line[4]))
+                    line[2] = id_mapping[i][line[2]]
+                    outfile.write(",".join(line) + "\n")
 
     G = generate_roary_gene_presence_absence(G,
                                              mems_to_isolates=mems_to_isolates,
@@ -362,6 +379,7 @@ def merge_graphs(directories,
     # write pan genome reference fasta file
     generate_pan_genome_reference(G,
                                   output_dir=output_dir,
+                                  ids_len_stop=ids_len_stop,
                                   split_paralogs=False)
 
     # write out common structural differences in a matrix format
@@ -414,14 +432,15 @@ def merge_graphs(directories,
     if aln == "pan":
         if not quiet: print("generating pan genome MSAs...")
         generate_pan_genome_alignment(G, temp_dir, output_dir, n_cpu, alr,
-                                      isolate_names)
+                                      codons, isolate_names)
         core_nodes = get_core_gene_nodes(G, core, len(isolate_names))
         concatenate_core_genome_alignments(core_nodes, output_dir, hc_threshold)
     elif aln == "core":
         if not quiet: print("generating core genome MSAs...")
         generate_core_genome_alignment(G, temp_dir, output_dir, n_cpu, alr,
-                                       isolate_names, core, len(isolate_names), 
-                                       hc_threshold)
+                                       isolate_names, core, codons, len(isolate_names), 
+                                       hc_threshold, subset)
+        
     return
 
 
@@ -446,7 +465,7 @@ def get_options():
                          dest="output_dir",
                          required=True,
                          help="location of a new output directory",
-                         type=lambda x: is_valid_folder(parser, x))
+                         type=str)
 
     matching = parser.add_argument_group('Matching')
 
@@ -518,11 +537,23 @@ def get_options():
         type=str,
         choices=['prank', 'clustal', 'mafft'],
         default="mafft")
+    core.add_argument(
+        "--codons",
+        dest="codons",
+        help=
+        "Generate codon alignments by aligning sequences at the protein level",
+        action='store_true',
+        default=False)
     core.add_argument("--core_threshold",
                       dest="core",
                       help="Core-genome sample threshold (default=0.95)",
                       type=float,
                       default=0.95)
+    core.add_argument("--core_subset",
+                      dest="subset",
+                      help="Randomly subset the core genome to these many genes (default=all)",
+                      type=int,
+                      default=None)
     core.add_argument("--core_entropy_filter",
                       dest="hc_threshold",
                       help=("Manually set the Block Mapping and Gathering with " +
@@ -555,12 +586,17 @@ def get_options():
 def main():
     args = get_options()
 
+    # create directory if it isn't present already
+    if not os.path.exists(args.output_dir):
+        os.mkdir(args.output_dir)
     # make sure trailing forward slash is present
     args.output_dir = os.path.join(args.output_dir, "")
+    
     args.directories = [os.path.join(d, "") for d in args.directories]
 
     # create temporary directory
     temp_dir = os.path.join(tempfile.mkdtemp(dir=args.output_dir), "")
+    os.environ['TMPDIR'] = temp_dir
 
     # run the main merge script
     merge_graphs(directories=args.directories,
@@ -576,7 +612,9 @@ def main():
                  aln=args.aln,
                  alr=args.alr,
                  core=args.core,
+                 codons=args.codons,
                  hc_threshold=args.hc_threshold,
+                 subset=args.subset,
                  n_cpu=args.n_cpu,
                  quiet=args.quiet)
 

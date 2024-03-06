@@ -54,10 +54,10 @@ def get_trans_table(table):
         translation_table = bact_translation_table.copy()
         tb = generic_by_id[table]
         for codon in tb.forward_table:
-            ind = reduce_array[np.fromstring(codon, dtype=np.int8)]
+            ind = reduce_array[np.array(bytearray(codon.encode()), dtype=np.int8)]
             translation_table[ind[0], ind[1], ind[2]] = tb.forward_table[codon].encode('utf-8')
         for codon in tb.stop_codons:
-            ind = reduce_array[np.fromstring(codon, dtype=np.int8)]
+            ind = reduce_array[np.array(bytearray(codon.encode()), dtype=np.int8)]
             translation_table[ind[0], ind[1], ind[2]] = b'*'
         return(translation_table)
     else:
@@ -65,7 +65,7 @@ def get_trans_table(table):
 
 
 def translate(seq, translation_table):
-    indices = reduce_array[np.fromstring(seq, dtype=np.int8)]
+    indices = reduce_array[np.array(bytearray(seq.encode()), dtype=np.int8)]
 
     return translation_table[
         indices[np.arange(0, len(seq), 3)], indices[np.arange(1, len(seq), 3)],
@@ -159,6 +159,7 @@ def get_gene_sequences(gff_file_name, file_number, filter_seqs, table):
             continue
 
         scaffold_id = None
+        gene_sequence = None
         for sequence_index in range(len(sequences)):
             scaffold_id = sequences[sequence_index].id
             if scaffold_id == entry.seqid:
@@ -207,6 +208,15 @@ def get_gene_sequences(gff_file_name, file_number, filter_seqs, table):
                 scaffold_genes[scaffold_id] = scaffold_genes.get(
                     scaffold_id, [])
                 scaffold_genes[scaffold_id].append(gene_record)
+        if gene_sequence is None:
+            print('Sequence ID not found in Fasta!', entry.seqid)
+            if filter_seqs: continue
+            else: raise ValueError("Invalid gene sequence!")
+
+    if len(scaffold_genes) == 0:
+        print("No valid sequences found in GFF!", gff_file_name)
+        raise ValueError("Invalid GFF!")
+
     for scaffold in scaffold_genes:
         scaffold_genes[scaffold] = sorted(scaffold_genes[scaffold],
                                           key=lambda x: x[0])
