@@ -13,10 +13,6 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from Bio.Align import MultipleSeqAlignment
 
-from Bio.Align.Applications import PrankCommandline
-from Bio.Align.Applications import MafftCommandline
-from Bio.Align.Applications import ClustalOmegaCommandline
-import Bio.Application
 from Bio import BiopythonExperimentalWarning
 import warnings
 with warnings.catch_warnings():
@@ -44,6 +40,8 @@ def check_aligner_install(aligner):
         command = "prank -help"
     elif aligner == "mafft":
         command = "mafft --help"
+    elif aligner == "none":
+        return True
     else:
         sys.stderr.write("Incorrect aligner specification\n")
         sys.exit()
@@ -142,11 +140,10 @@ def output_dna_and_protein(node, isolate_list, temp_directory, outdir,
 
     #only output genes with more than one isolate in them
     if isolate_no > 1:
+        fastafilename = node["name"]
         #set filename to gene name
-        if len(prot_outname) >= 237: 
+        if len(fastafilename) >= 237: 
             fastafilename = node["name"][:236]
-        else:
-            fastafilename = node["name"]
         prot_outname = temp_directory + fastafilename + ".fasta"
         dna_outname = outdir + "unaligned_dna_sequences/" + fastafilename + ".fasta"
         #Write them to disk time
@@ -166,22 +163,25 @@ def output_dna_and_protein(node, isolate_list, temp_directory, outdir,
 
 def get_alignment_commands(fastafile_name, outdir, aligner, threads):
     geneName = fastafile_name.split("/")[-1].split(".")[0]
+
     if aligner == "prank":
-        command = PrankCommandline(d=fastafile_name, 
-            o=outdir + "aligned_gene_sequences/" + geneName, 
-            f=8, codon=False
-        )
+        command = "prank"
+        command += " -d=" + fastafile_name
+        command += " -o=" + outdir + "aligned_gene_sequences/" + geneName
+        command += " -f=8"
+
     elif  aligner == "mafft":
-        command = MafftCommandline(
-            input=fastafile_name, auto=True, nuc=True, adjustdirection=True, thread=1
-        )
+        command = "mafft "
+        command += "--auto --adjustdirection --thread 1 --nuc "
+        command += fastafile_name
+
     elif aligner == "clustal":
-        command = ClustalOmegaCommandline(
-            infile=fastafile_name,
-            outfile=outdir + "aligned_gene_sequences/" + geneName + ".aln.fas",
-            seqtype="DNA",  threads=1
-        )
-   
+        command = "clustalo "
+        command += " -i " + fastafile_name 
+        command += " -t DNA"
+        command += " --threads 1" 
+        command += " -o " + outdir + "aligned_gene_sequences/" + geneName + ".aln.fas"
+
     return (command, fastafile_name)
 
 def get_protein_commands(fastafile_name, outdir, aligner, threads):
@@ -190,34 +190,23 @@ def get_protein_commands(fastafile_name, outdir, aligner, threads):
     else:
         return (None, None)
     if aligner == "prank":
-        command = PrankCommandline(d=fastafile_name,
-                                   o=geneName,
-                                   f=8,
-                                   protein=True)
-    elif (threads > 3):
-        if aligner == "mafft":
-            command = MafftCommandline(input=fastafile_name,
-                                       auto=True,
-                                       amino=True)
-        elif aligner == "clustal":
-            command = ClustalOmegaCommandline(
-                infile=fastafile_name,
-                outfile=outdir + "aligned_protein_sequences/" + geneName +
-                ".aln.fas",
-                seqtype="Protein")
-    elif (threads <= 3):
-        if aligner == "mafft":
-            command = MafftCommandline(input=fastafile_name,
-                                       auto=True,
-                                       thread=threads,
-                                       amino=True)
-        elif aligner == "clustal":
-            command = ClustalOmegaCommandline(
-                infile=fastafile_name,
-                outfile=outdir + "aligned_protein_sequences/" + geneName +
-                ".aln.fas",
-                seqtype="Protein",
-                threads=threads)
+        command = "prank "
+        command += "-d=" + fastafile_name + " "
+        command += "-o=" + geneName + " "
+        command += "-f=8"
+
+    elif aligner == "mafft":
+        command = "mafft "
+        command += "--auto --amino "
+        command += fastafile_name
+
+    elif aligner == "clustal":
+        command = "clustalo "
+        command += " -i " + fastafile_name 
+        command += " -t Protein"
+        command += " --threads 1" 
+        command += " -o " + outdir + "aligned_protein_sequences/" + geneName + ".aln.fas"
+
     return (command, fastafile_name)
 
 def get_align_dna_to_alignment_commands(bad_dna_seqs_file, codonalignment_file, 
@@ -247,23 +236,19 @@ def align_sequences(command, outdir, aligner):
     if command[0] == None:
         return None
     if aligner == "mafft":
-        name = str(command[0]).split()[-1].split("/")[-1].split(".")[0]
-        stdout, stderr = command[0]()
-        with open(outdir + name + ".aln.fas", "w+") as handle:
+        name = command[0].split()[-1].split("/")[-1].split(".")[0]
+        
+        stdout, stderr = subprocess.Popen(
+            command[0], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        ).communicate()
+
+        with open(outdir + name + ".aln.fas", "wb+") as handle:
             handle.write(stdout)
-    elif aligner == "clustal":
-        try:
-            stdout, stderr = command[0]()
-        except Bio.Application.ApplicationError as error:
-            inputname = str(command[0]).split("-i")[1].split("-t")[0].strip()
-            name = inputname.split("/")[-1]
-            print(error)
-            if "contains 1 sequence, nothing to align" in str(error):
-                os.rename(inputname, outdir + name)
-            else:
-                raise Exception("Clustal failed to run on" + inputname)
+
     else:
-        stdout, stderr = command[0]()
+        result = subprocess.Popen(
+            command[0], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
     try:
         os.remove(command[1])
     except FileNotFoundError:
@@ -322,6 +307,21 @@ def read_alignment(handle):
         alignment = AlignIO.read(inhandle, 'fasta')
     return alignment
 
+def multithread_codonalign_build(dna, protein, name):
+    try:
+        codon_alignment = codonalign.build(dna, protein)
+    except RuntimeError as e:
+        print(e)
+        print(name)
+        print(dna)
+        print(protein)
+    except IndexError as e:
+        print(e)
+        print(name)
+        print(dna)
+        print(protein)
+    return(name, codon_alignment)
+
 def reverse_translate_sequences(protein_sequence_files, dna_sequence_files, 
                                 outdir, temp_directory, aligner, threads):
     #Check that the dna and protein files match up
@@ -351,8 +351,8 @@ def reverse_translate_sequences(protein_sequence_files, dna_sequence_files,
     clean_proteins = []
     
     reject_dna_files = {}
-    
-    for index in range(len(dna_sequences)):
+    print("Getting sequences...")
+    for index in tqdm(range(len(dna_sequences))):
         dna = list(dna_sequences[index])
         protein = protein_alignments[index]
         seqids_to_remove = []
@@ -418,36 +418,23 @@ def reverse_translate_sequences(protein_sequence_files, dna_sequence_files,
             clean_proteins.append(protein)                         
     
     #build codon alignments
-    
-    #codon_alignments = Parallel(n_jobs=threads, prefer="threads")(
-    #        delayed(codonalign.build)
-    #        (protein_alignments[index], list(dna_sequences[index])) 
-    #        for index in range(len(protein_alignments)))
-    
 
-    #do it single threaded because of the need to separate aln missing DNA seq
-    
+    #Multithreaded
+    print("Reverse translating DNA...")
     completed_codon_alignments = {}
     missing_sequences_codon_alignments = {}
-    for index in range(len(clean_proteins)):
-        gene_name = dna_sequence_files[index].split('/')[-1].split(".")[0]
-        try:
-            alignment = codonalign.build(clean_proteins[index], clean_dna[index])
-            if gene_name in reject_dna_files.keys():
-                missing_sequences_codon_alignments[gene_name] = alignment
-            else:
-                completed_codon_alignments[gene_name] = alignment
-        except RuntimeError as e:
-            print(e)
-            print(index)
-            print(protein_sequence_files[index])
-            print(dna_sequence_files[index])
-        except IndexError as e:
-            print(e)
-            print(index)
-            print(protein_sequence_files[index])
-            print(dna_sequence_files[index])
     
+    all_codon_alignments = Parallel(n_jobs = threads, prefer = "threads")(
+        delayed(multithread_codonalign_build)
+        (clean_proteins[index], clean_dna[index], 
+         dna_sequence_files[index].split('/')[-1].split(".")[0])
+        for index in tqdm(range(len(clean_proteins))))
+    
+    for alignment in all_codon_alignments:
+        if alignment[0] in reject_dna_files.keys():
+            missing_sequences_codon_alignments[alignment[0]] = alignment[1]
+        else:
+            completed_codon_alignments[alignment[0]] = alignment[1]
     
     #Remove <unknown description> from codon alignments
     for gene in completed_codon_alignments:
@@ -484,6 +471,8 @@ def reverse_translate_sequences(protein_sequence_files, dna_sequence_files,
                             temp_directory + gene_name + ".aln.fas", 
                             outdir, aligner)
         dna2codons_commands.append(command)
+    
+    print("Aligning untranslatable DNA...")
     
     multi_realign_sequences(dna2codons_commands, outdir + "aligned_gene_sequences/",
                               threads, aligner)
