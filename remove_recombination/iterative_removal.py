@@ -30,9 +30,9 @@ def get_gpa_subset(gpa, isolates):
         if x == 0:
             continue
         elif x ==1:
-            genes_in_common = (gpa[isolates[x-1]==1) & (gpa[isolates[x]==1)
+            genes_in_common = (gpa[isolates[x-1]==1]) & (gpa[isolates[x]==1])
         else:
-            genes_in_common = genes_in_common | (gpa[isolates[x]==1)
+            genes_in_common = genes_in_common | (gpa[isolates[x]==1])
 
     gene_names_in_common= gpa[genes_in_common].index
 

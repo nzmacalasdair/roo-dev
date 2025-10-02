@@ -66,6 +66,7 @@ def main():
     gene_names, pairwise_differences = parse_pangenome(args.outdir, args.n_cpu)
     #Order genes from least snps/length to greatest snps/length
     ordered_pairs = order_pairwise_diffs(pairwise_differences)
+    
     #Set up some empty dics for results
     gene_recombination_dic = {}
     pairwise_rm_estimates = {}
@@ -73,26 +74,45 @@ def main():
     total_dists = {}
 
     #Do analysis, either bayesian or frequentist to identify recomb. gene pairs
+    ##single-threaded code, for now    
+    # for pair in ordered_pairs:
+    #     if args.method == "bayesian":
+    #         recombinants, dists = recombination_analysis_bayesian(ordered_pairs[pair])
+    #         print(recombinants)
+    #         print(dists)
+    #     elif args.method == "frequentist":
+    #         recombinants, dists = recombination_analysis_frequentist(ordered_pairs[pair])            
+    #         print(recombinants)
+    #         print(dists)
+    #     for gene in recombinants:
+    #             gene_recombination_dic[gene] = gene_recombination_dic.get(gene,
+    #                                                                   []) + [pair]
+    #     total_dists[pair] = dists[0]
+    #     cleaned_dists[pair] = dists[1]
+    #     pairwise_rm_estimates = dists[2]/dists[1]
     
-    #model_probabilities, mean_distance = Parallel
-    ##single-threaded code, for now
+    #multithreading
+    if args.method =="bayesian":
+        pairwise_recombinant_genes, mean_distances = Parallel(n_jobs=args.n_cpu, 
+                                                              prefer="threads")(
+            delayed(recombination_analysis_bayesian)(ordered_pairs[pair]) for pair in ordered_pairs) 
+    elif args.method == "frequentist":
+        pairwise_recombinant_genes, mean_distances = Parallel(n_jobs=args.n_cpu, 
+                                                              prefer="threads")(
+            delayed(recombination_analysis_frequentist)(ordered_pairs[pair]) for pair in ordered_pairs) 
     
-    for pair in ordered_pairs:
-        if args.method == "bayesian":
-            recombinants, dists = recombination_analysis_bayesian(ordered_pairs[pair])
-            print(recombinants)
-            print(dists)
-        elif args.method == "frequentist":
-            recombinants, dists = recombination_analysis_frequentist(ordered_pairs[pair])            
-            print(recombinants)
-            print(dists)
-        for gene in recombinants:
-                gene_recombination_dic[gene] = gene_recombination_dic.get(gene,
-                                                                      []) + [pair]
-        total_dists[pair] = dists[0]
-        cleaned_dists[pair] = dists[1]
-        pairwise_rm_estimates = dists[2]/dists[1]
-  
+    #Reformat pairwise results
+    for index in range(len(ordered_pairs)):
+        pair_recombinants = pairwise_recombinant_genes[index]
+        pair_dists = mean_distances[index]
+        pair = ordered_pairs[index]
+        for gene in pair_recombinants:
+            gene_recombination_dic[gene] = gene_recombination_dic.get(gene,
+                                                                  []) + [pair]
+        total_dists[pair] = pair_dists[0]
+        cleaned_dists[pair] = pair_dists[1]
+        pairwise_rm_estimates = pair_dists[2]/dists[1]
+                                                                  
     #Reduce recombinant pairs to only isolates where recombination is present
     #Do this by making a network and taking only isolates of degree > 2
     actual_recombinants_to_remove = {}
