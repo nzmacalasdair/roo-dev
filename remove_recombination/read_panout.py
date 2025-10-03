@@ -21,17 +21,25 @@ def read_and_close_fasta(filename):
        seq_generator = SeqIO.parse(inhandle, 'fasta')
        return list(seq_generator)
 
-def get_pairwise_differences(str1, str2):
-    if len(str1) != len(str2):
+def get_pairwise_differences(seq1, seq2):
+    if seq1.size != seq2.size:
         raise ValueError("Sequences are of different lengths!")
-    seq1 = np.fromstring(str1.lower(), dtype=np.int8)
-    seq2 = np.fromstring(str2.lower(), dtype=np.int8)
-    diffs = np.count_nonzero(seq1-seq2)
-    length = len(str1)
+    diffs = np.count_nonzero(seq1^seq2)
+    length = seq1.size
     result = (np.array([diffs, length]))
     return result
 
-def get_pangenome_pairwise_differences(gene_alignments, sequences_to_consider):    
+def check_for_big_indel(byteseq1, byteseq2):
+    gaps1 = np.count_nonzero(byteseq1 == ord('-'))
+    gaps2 = np.count_nonzero(byteseq2 == ord('-'))
+    diff = gaps2 - gaps1
+    if (diff/gaps1.size) > 0.05:
+        return diff
+    else: 
+        return None
+    
+
+def get_pangenome_pairwise_differences(gene_alignments, isolates_to_consider):    
     #Legacy code  -- extremely slow
     # diffs = []
     # names = []
@@ -52,8 +60,8 @@ def get_pangenome_pairwise_differences(gene_alignments, sequences_to_consider):
     diffs = []
     names = []
     for gene in gene_alignments:
-        seq1 = gene[0].get(sequences_to_consider[0], None)
-        seq2 = gene[0].get(sequences_to_consider[1], None)
+        seq1 = gene[0].get(isolates_to_consider[0], None)
+        seq2 = gene[0].get(isolates_to_consider[1], None)
         if seq1 == None or seq2 == None:
             continue
         diffs.append(get_pairwise_differences(str(seq1), str(seq2)))
@@ -87,7 +95,9 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads):
     for alignment in sequences:
         for sequence in alignment:
             sequence.id = sequence.id.split(";")[0]
-        lookup_dic = {sequence.id: sequence.seq for sequence in alignment}
+            bitseq = np.frombuffer(str(sequence.seq).lower().encode('ascii'),
+                                   dtype=np.uint8)
+        lookup_dic = {sequence.id: bitseq for sequence in alignment}
         alignments_dics.append(lookup_dic)
     
     alignments = [(alignments_dics[x], 
