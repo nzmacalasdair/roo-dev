@@ -62,9 +62,9 @@ def get_pangenome_pairwise_differences(gene_alignments, isolates_to_consider):
     for gene in gene_alignments:
         seq1 = gene[0].get(isolates_to_consider[0], None)
         seq2 = gene[0].get(isolates_to_consider[1], None)
-        if seq1 == None or seq2 == None:
+        if (seq1 is None) or (seq2 is None):
             continue
-        diffs.append(get_pairwise_differences(str(seq1), str(seq2)))
+        diffs.append(get_pairwise_differences(seq1, seq2))
         names.append(gene[1].split(".")[0])
     diffs = np.array(diffs)
     return (diffs, names)
