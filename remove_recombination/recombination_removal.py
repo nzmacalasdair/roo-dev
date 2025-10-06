@@ -93,14 +93,15 @@ def main():
     
     #multithreading
     if args.method =="bayesian":
-        pairwise_recombinant_genes, mean_distances = Parallel(n_jobs=args.n_cpu, 
+         results = Parallel(n_jobs=args.n_cpu, 
                                                               prefer="threads")(
-            delayed(recombination_analysis_bayesian)(ordered_pairs[pair]) for pair in ordered_pairs) 
+            delayed(recombination_analysis_bayesian)(ordered_pairs[pair]) for pair in ordered_pairs)
+         pairwise_recombinant_genes, mean_distances = zip(*results)                                                         
     elif args.method == "frequentist":
-        pairwise_recombinant_genes, mean_distances = Parallel(n_jobs=args.n_cpu, 
+        results = Parallel(n_jobs=args.n_cpu, 
                                                               prefer="threads")(
             delayed(recombination_analysis_frequentist)(ordered_pairs[pair]) for pair in ordered_pairs) 
-    
+        pairwise_recombinant_genes, mean_distances = zip(*results)
     #Reformat pairwise results
     for index in range(len(ordered_pairs)):
         pair_recombinants = pairwise_recombinant_genes[index]
