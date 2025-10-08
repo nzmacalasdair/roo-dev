@@ -10,14 +10,14 @@ from scipy import optimize
 #genes, and estimate r/m for the collection
 
 def order_pairwise_diffs(pairwise_matrices):
-    all_ordered_diffs = {}
+    all_ordered_diffs = []
     for pair in pairwise_matrices:
         genes = pairwise_matrices[pair][1] 
         pairwise = pairwise_matrices[pair][0]
         proportion = pairwise[:,0] / pairwise[:,1]
         ordered = pairwise[proportion.argsort()]
         ordered_genes = np.array(genes)[proportion.argsort()]
-        all_ordered_diffs[pair] = (ordered, ordered_genes)
+        all_ordered_diffs.append((pair, ordered, ordered_genes))
     return all_ordered_diffs
 
 def calc_log_likelihood(lengths, diffs, hyp_par_1, hyp_par_2):
