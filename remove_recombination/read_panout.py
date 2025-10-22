@@ -13,6 +13,8 @@ from Bio.SeqRecord import SeqRecord
 #This module contains all functions necessary to read panaroo input, and
 # write all outputs
 
+from remove_recombination.pairwise_comparisons import *
+
 def read_and_close_fasta(filename):
     #This is necessary because SeqIO generaotrs and joblib Parallel do not play
     #nicely, the generators containing sequence require files to remain open,
@@ -20,58 +22,6 @@ def read_and_close_fasta(filename):
     with open(filename, 'r') as inhandle:
        seq_generator = SeqIO.parse(inhandle, 'fasta')
        return list(seq_generator)
-
-def get_pairwise_differences(seq1, seq2):
-    if seq1.size != seq2.size:
-        raise ValueError("Sequences are of different lengths!")
-    diffs = np.count_nonzero(seq1^seq2)
-    length = seq1.size
-    result = (np.array([diffs, length]))
-    return result
-
-def check_for_big_indel(byteseq1, byteseq2):
-    gaps1 = np.count_nonzero(byteseq1 == ord('-'))
-    gaps2 = np.count_nonzero(byteseq2 == ord('-'))
-    diff = gaps2 - gaps1
-    if (diff/gaps1.size) > 0.05:
-        return diff
-    else: 
-        return None
-    
-
-def get_pangenome_pairwise_differences(gene_alignments, isolates_to_consider):    
-    #Legacy code  -- extremely slow
-    # diffs = []
-    # names = []
-    # for sequences in sequence_files:
-    #     seq1 = None
-    #     seq2 = None
-    #     for sequence in sequences[0]:
-    #         if sequences_to_consider[0] in sequence.id:
-    #             seq1=str(sequence.seq)
-    #         elif sequences_to_consider[1] in sequence.id:
-    #             seq2 = str(sequence.seq)
-    #         else:
-    #             continue
-    #     if (type(seq1) == str) and (type(seq2) == str):
-    #         diffs.append(get_pairwise_differences(seq1, seq2))
-    #         names.append(sequences[1].split(".")[0])
-    # diffs = np.array(diffs)  
-    diffs = []
-    names = []
-    for gene in gene_alignments:
-        seq1 = gene[0].get(isolates_to_consider[0], None)
-        seq2 = gene[0].get(isolates_to_consider[1], None)
-        if (seq1 is None) or (seq2 is None):
-            continue
-        diffs.append(get_pairwise_differences(seq1, seq2))
-        names.append(gene[1].split(".")[0])
-    diffs = np.array(diffs)
-    return (diffs, names)
-
-def get_pairs(isolate_list):
-    pairs_list = [(isolate_list[i], isolate_list[j]) for i in range(len(isolate_list)) for j in range(i+1,len(isolate_list))]
-    return pairs_list
 
 def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads):
     pair_diff_len_distributions = {}
@@ -91,18 +41,23 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads):
 
     #preprocess alignments to remove gene ids, only keep isolate ids
     #also format alignments object as dic to enable fast lookup
-    alignments_dics = []    
+    alignments_dics = []
+    gaps_dics = []    
     for alignment in sequences:
+        lookup_dic = {}
+        gaps_dic = {}
         for sequence in alignment:
             sequence.id = sequence.id.split(";")[0]
+            gaps_dic[sequence.id] = (sequence.seq.count("-"), len(sequence.seq))
             bitseq = np.frombuffer(str(sequence.seq).lower().encode('ascii'),
                                    dtype=np.uint8)
-        lookup_dic = {sequence.id: bitseq for sequence in alignment}
+            lookup_dic[sequence.id] =  bitseq
+        gaps_dics.append(gaps_dic)
         alignments_dics.append(lookup_dic)
     
     alignments = [(alignments_dics[x], 
                    filtered_alignment_names[x]) for x in range(len(sequences))]
-
+    
     ##Legacy single-threaded code
     # alignments = []
     # for alignment in filtered_alignment_names:
@@ -119,12 +74,13 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads):
         delayed(get_pangenome_pairwise_differences)(alignments, pair)
         for pair in tqdm(pairs))
     
+    
     pairids = ["-".join(x) for x in pairs]
     pair_diff_len_distributions = {}
     for index in range(len(pairs)):
         pair_diff_len_distributions[pairids[index]] = diffs_lens[index]
     
-    return [x.split(".")[0] for x in filtered_alignment_names], pair_diff_len_distributions
+    return [x.split(".")[0] for x in filtered_alignment_names], pair_diff_len_distributions    
 
 def parse_pangenome(output_dir, threads):
     if output_dir[-1] != "/":

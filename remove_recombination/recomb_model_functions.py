@@ -14,7 +14,13 @@ def order_pairwise_diffs(pairwise_matrices):
     for pair in pairwise_matrices:
         genes = pairwise_matrices[pair][1] 
         pairwise = pairwise_matrices[pair][0]
-        proportion = pairwise[:,0] / pairwise[:,1]
+        try:
+            proportion = pairwise[:,0] / pairwise[:,1]
+        except Exception as e:
+            print(e)
+            print(pairwise)
+            import sys
+            sys.exit()
         ordered = pairwise[proportion.argsort()]
         ordered_genes = np.array(genes)[proportion.argsort()]
         all_ordered_diffs.append((pair, ordered, ordered_genes))
@@ -79,7 +85,7 @@ def analyse_pair_frequentist(ordered_diffs, ordered_lengths, ordered_genes):
     average_proportion = sum(ordered_diffs) / sum(ordered_lengths)
     threshold = 0
     
-    for cutoff in range(len(ordered_diffs), 0, -1):
+    for cutoff in range(1, len(ordered_diffs)):
         pvalue = 1 - stats.binom.cdf(max(ordered_diffs[cutoff-1], 0), 
                                      ordered_lengths[cutoff-1],
                                      average_proportion)
