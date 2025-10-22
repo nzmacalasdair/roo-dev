@@ -113,18 +113,32 @@ def main():
         total_dists[pair] = pair_dists[0]
         cleaned_dists[pair] = pair_dists[1]
         pairwise_rm_estimates = pair_dists[2]/pair_dists[1]
-                                                                  
+    
+    if gene_recombination_dic == {}:
+        print("ERROR: Gene recombination dictionary is empty")
+        print("Latest pair_recombinants:")
+        print(pair_recombinants)
+        print("All pairwise recombinants:")
+        print(pairwise_recombinant_genes)
+        print("results")
+        print(results)
+        print("Ordered pairs[0]:")
+        print(ordered_pairs[0])
+
     #Reduce recombinant pairs to only isolates where recombination is present
     #Do this by making a network and taking only isolates of degree > 2
+    if not os.path.isdir(args.outdir + "pairwise_recombination_networks/"):
+        os.mkdir(args.outdir + "pairwise_recombination_networks/")
     actual_recombinants_to_remove = {}
-    print(gene_recombination_dic)
     for gene in gene_recombination_dic:
         if len(gene_recombination_dic[gene]) > 1:
             gene_network = nx.Graph()
             for recombinant_pair in gene_recombination_dic[gene]:
                 recombination_list = recombinant_pair.split("-")
                 gene_network.add_edge(*recombination_list)
-            if len(gene_network.nodes) > 4:
+            nx.write_gml(gene_network, 
+                         args.outdir + "pairwise_recombination_networks/" + gene + ".gml")
+            if len(gene_network.nodes) >= 4:
                 to_remove = []
                 min_degree = min([x[1] for x in gene_network.degree])
                 if min_degree == max([x[1] for x in gene_network.degree]):
@@ -138,7 +152,13 @@ def main():
         else:
             to_remove = gene_recombination_dic[gene][0].split("-")
         actual_recombinants_to_remove[gene] = to_remove
-    print(actual_recombinants_to_remove)
+    #Output list of recombinant gene sequence names
+    with open(args.outdir + "recombinant_gene_ids.csv", 'w+') as outhandle:
+       outhandle.write("Gene,Recombinant_Isolates\n")
+       for gene in actual_recombinants_to_remove:
+           outline = gene +','+ ";".join(actual_recombinants_to_remove[gene])
+           outhandle.write(outline + '\n')
+    
     #Remove recombinant sequences and write new alignments to file
     remove_recombinant_seqs(actual_recombinants_to_remove, args.outdir)
     #Write new core genome alignment
@@ -161,7 +181,6 @@ def main():
     if args.plot_rm == True:
         import matplotlib
         import matplotlib.pyplot as plt
-        plt.style.use('ggplot')
         
         plt.scatter(dist_lists[0], dist_lists[1])
         plt.plot(np.arange(max(dist_lists[0])), 
