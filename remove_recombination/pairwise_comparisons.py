@@ -1,5 +1,7 @@
 import numpy as np
 
+import cupy as cp
+
 def check_for_big_indel(byteseq1, byteseq2):
     gaps1 = np.sum(byteseq1 == 45) #45 == ord("-") 
     gaps2 = np.sum(byteseq2 == 45)
@@ -9,32 +11,68 @@ def check_for_big_indel(byteseq1, byteseq2):
     else: 
         return None
 
+def check_for_big_indel_gpu(byteseq1, byteseq2):
+    gaps1 = cp.sum(byteseq1 == 45) #45 == ord("-") 
+    gaps2 = cp.sum(byteseq2 == 45)
+    diff = gaps2 - gaps1
+    if (diff/gaps1.size) > 0.15:
+        return diff
+    else: 
+        return None
+
 def get_pairwise_differences(seq1, seq2, gpu):
     if seq1.size != seq2.size:
         raise ValueError("Two aligned sequences are of different lengths!")
-    if check_for_big_indel == None:
-        diffs = np.count_nonzero(seq1^seq2)
-        length = seq1.size
-        result = (np.array([diffs, length]))
-        return result
-    else:
-        mask = seq1 != 45
-        consecutive_bases = np.diff(np.concatenate(([0], mask.astype(int), [0])))
-        start_positions = np.where(consecutive_bases == 1)[0]
-        end_positions = np.where(consecutive_bases == -1)[0]
-        lengths = end_positions - start_positions
-        
-        longest_seq_index = np.argmax(lengths)
-        longest_seq_start = start_positions[longest_seq_index]
-        longest_seq_end = end_positions[longest_seq_index]
-        
-        cropped_seq1 = seq1[longest_seq_start:longest_seq_end]
-        cropped_seq2 = seq2[longest_seq_start:longest_seq_end]
-        
-        diffs = np.count_nonzero(cropped_seq1^cropped_seq2)
-        length = cropped_seq1.size
-        result = (np.array([diffs, length]))
-        return result
+    
+    if gpu:
+        if check_for_big_indel_gpu == None:
+            diffs = cp.count_nonzero(seq1^seq2)
+            length = seq1.size
+            result = (np.array([diffs, length]))
+            return result
+        else:
+            mask = seq1 != 45
+            consecutive_bases = cp.diff(np.concatenate(([0], mask.astype(int), [0])))
+            start_positions = cp.where(consecutive_bases == 1)[0]
+            end_positions = cp.where(consecutive_bases == -1)[0]
+            lengths = end_positions - start_positions
+            
+            longest_seq_index = cp.argmax(lengths)
+            longest_seq_start = start_positions[longest_seq_index]
+            longest_seq_end = end_positions[longest_seq_index]
+            
+            cropped_seq1 = seq1[longest_seq_start:longest_seq_end]
+            cropped_seq2 = seq2[longest_seq_start:longest_seq_end]
+            
+            diffs = cp.count_nonzero(cropped_seq1^cropped_seq2)
+            length = cropped_seq1.size
+            result = (np.array([diffs, length]))
+            return result
+            
+    else:    
+        if check_for_big_indel == None:
+            diffs = np.count_nonzero(seq1^seq2)
+            length = seq1.size
+            result = (np.array([diffs, length]))
+            return result
+        else:
+            mask = seq1 != 45
+            consecutive_bases = np.diff(np.concatenate(([0], mask.astype(int), [0])))
+            start_positions = np.where(consecutive_bases == 1)[0]
+            end_positions = np.where(consecutive_bases == -1)[0]
+            lengths = end_positions - start_positions
+            
+            longest_seq_index = np.argmax(lengths)
+            longest_seq_start = start_positions[longest_seq_index]
+            longest_seq_end = end_positions[longest_seq_index]
+            
+            cropped_seq1 = seq1[longest_seq_start:longest_seq_end]
+            cropped_seq2 = seq2[longest_seq_start:longest_seq_end]
+            
+            diffs = np.count_nonzero(cropped_seq1^cropped_seq2)
+            length = cropped_seq1.size
+            result = (np.array([diffs, length]))
+            return result
         
         
 
