@@ -51,6 +51,10 @@ def main():
                         help="number of threads to use (default=1)",
                         type=int,
                         default=1)
+    parser.add_argument("--gpu",
+                        action="store_true",
+                        help="""Use CuPy to speed up pairwise distance estimates. 
+                        Highly recomended on datasets of >=10^3 isolates""")
     args = parser.parse_args()
     
     #Make sure formatting is correct for panaroo dir, and create new out dir
@@ -63,7 +67,7 @@ def main():
         raise ValueError("Method must be one of [bayesian, frequentist]")
         
     #Load in relevant info from genes
-    gene_names, pairwise_differences = parse_pangenome(args.outdir, args.n_cpu)
+    gene_names, pairwise_differences = parse_pangenome(args.outdir, args.n_cpu, args.gpu)
     #Order genes from least snps/length to greatest snps/length
     ordered_pairs = order_pairwise_diffs(pairwise_differences)
     

@@ -9,7 +9,7 @@ def check_for_big_indel(byteseq1, byteseq2):
     else: 
         return None
 
-def get_pairwise_differences(seq1, seq2):
+def get_pairwise_differences(seq1, seq2, gpu):
     if seq1.size != seq2.size:
         raise ValueError("Two aligned sequences are of different lengths!")
     if check_for_big_indel == None:

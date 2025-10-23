@@ -82,7 +82,7 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads):
     
     return [x.split(".")[0] for x in filtered_alignment_names], pair_diff_len_distributions    
 
-def parse_pangenome(output_dir, threads):
+def parse_pangenome(output_dir, threads, use_gpu):
     if output_dir[-1] != "/":
         output_dir += "/"
     #Get all the pairwise comparison combinations
@@ -117,7 +117,7 @@ def parse_pangenome(output_dir, threads):
     allh = np.array([float(gene[1]) for gene in hc_vals])
     q = np.quantile(allh, [0.25,0.75])
     hc_threshold = max(0.01, q[1] + 1.5*(q[1]-q[0]))
-    print(f"Entropy threshold automatically set to {hc_threshold}.")
+    print(f"Entropy threshold set to {hc_threshold}.")
     
     for gene in hc_vals:
         if float(gene[1]) > hc_threshold:
@@ -127,7 +127,7 @@ def parse_pangenome(output_dir, threads):
     #Get all the distributions of pairwise differences
     
     ordered_genes, pairwise_differences = get_all_pairwise_diffs(pairs, genes, 
-                                                gene_alignments_dir, threads)
+                                                gene_alignments_dir, threads, use_gpu)
 
     return(genes, pairwise_differences)
 
