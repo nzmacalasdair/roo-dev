@@ -82,7 +82,7 @@ def get_pairs(isolate_list):
     pairs_list = [(isolate_list[i], isolate_list[j]) for i in range(len(isolate_list)) for j in range(i+1,len(isolate_list))]
     return pairs_list
 
-def get_pangenome_pairwise_differences(gene_alignments, isolates_to_consider):    
+def get_pangenome_pairwise_differences(gene_alignments, isolates_to_consider, gpu):    
     #Legacy code  -- extremely slow
     # diffs = []
     # names = []
@@ -107,7 +107,7 @@ def get_pangenome_pairwise_differences(gene_alignments, isolates_to_consider):
         seq2 = gene[0].get(isolates_to_consider[1], None)
         if (seq1 is None) or (seq2 is None):
             continue
-        diffs.append(get_pairwise_differences(seq1, seq2))
+        diffs.append(get_pairwise_differences(seq1, seq2, gpu))
         names.append(gene[1].split(".")[0])
     diffs = np.array(diffs)
     return (diffs, names)

@@ -23,7 +23,7 @@ def read_and_close_fasta(filename):
        seq_generator = SeqIO.parse(inhandle, 'fasta')
        return list(seq_generator)
 
-def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads):
+def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads, gpu):
     pair_diff_len_distributions = {}
     alignment_names = os.listdir(alignment_directory)
     print("Reading alignments...")
@@ -71,7 +71,7 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads):
     
     print("Calculating pairwise distances...")
     diffs_lens = Parallel(n_jobs=threads, prefer="threads")(
-        delayed(get_pangenome_pairwise_differences)(alignments, pair)
+        delayed(get_pangenome_pairwise_differences)(alignments, pair, gpu)
         for pair in tqdm(pairs))
     
     
