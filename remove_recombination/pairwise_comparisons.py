@@ -12,8 +12,8 @@ def check_for_big_indel(byteseq1, byteseq2):
         return None
 
 def check_for_big_indel_gpu(byteseq1, byteseq2):
-    gaps1 = cp.sum(cp.array(byteseq1) == 45) #45 == ord("-") 
-    gaps2 = cp.sum(cp.array(byteseq2) == 45)
+    gaps1 = cp.sum(cp.asarray(byteseq1) == 45) #45 == ord("-") 
+    gaps2 = cp.sum(cp.asarray(byteseq2) == 45)
     diff = gaps2 - gaps1
     if (diff/gaps1.size) > 0.15:
         return diff
@@ -25,8 +25,8 @@ def get_pairwise_differences(seq1, seq2, gpu):
         raise ValueError("Two aligned sequences are of different lengths!")
     
     if gpu:
-        seq1 = cp.array(seq1)
-        seq2 = cp.array(seq2)
+        seq1 = cp.asarray(seq1)
+        seq2 = cp.asarray(seq2)
         if check_for_big_indel_gpu == None:
             diffs = cp.count_nonzero(seq1^seq2)
             length = seq1.size
