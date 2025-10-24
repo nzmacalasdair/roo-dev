@@ -30,7 +30,7 @@ def get_pairwise_differences(seq1, seq2, gpu):
         if check_for_big_indel_gpu == None:
             diffs = cp.count_nonzero(seq1^seq2)
             length = seq1.size
-            result = (np.array([diffs, length]))
+            result = (np.array([diffs.get(), length]))
             return result
         else:
             mask = seq1 != 45
@@ -50,7 +50,7 @@ def get_pairwise_differences(seq1, seq2, gpu):
             
             diffs = cp.count_nonzero(cropped_seq1^cropped_seq2)
             length = cropped_seq1.size
-            result = (np.array([diffs, length]))
+            result = (np.array([diffs.get(), length]))
             return result
             
     else:    
