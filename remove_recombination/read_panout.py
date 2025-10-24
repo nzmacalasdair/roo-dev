@@ -70,7 +70,7 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads, gpu)
     #    pair_diff_len_distributions[pairid] = get_pangenome_pairwise_differences(alignments, pair)
     
     print("Calculating pairwise distances...")
-    diffs_lens = Parallel(n_jobs=threads, prefer="threads")(
+    diffs_lens = Parallel(n_jobs=threads, prefer="multiprocessing")(
         delayed(get_pangenome_pairwise_differences)(alignments, pair, gpu)
         for pair in tqdm(pairs))
     
@@ -125,9 +125,6 @@ def parse_pangenome(output_dir, threads, use_gpu):
             if name in genes:
                 genes.remove(name)
     #Get all the distributions of pairwise differences
-    
-    if use_gpu == True:
-        threads = 1
     
     ordered_genes, pairwise_differences = get_all_pairwise_diffs(pairs, genes, 
                                                 gene_alignments_dir, threads, use_gpu)
