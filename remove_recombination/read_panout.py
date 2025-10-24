@@ -126,6 +126,9 @@ def parse_pangenome(output_dir, threads, use_gpu):
                 genes.remove(name)
     #Get all the distributions of pairwise differences
     
+    if use_gpu == True:
+        threads = 1
+    
     ordered_genes, pairwise_differences = get_all_pairwise_diffs(pairs, genes, 
                                                 gene_alignments_dir, threads, use_gpu)
 
