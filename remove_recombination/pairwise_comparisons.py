@@ -34,7 +34,7 @@ def get_pairwise_differences(seq1, seq2, gpu):
             return result
         else:
             mask = seq1 != 45
-            consecutive_bases = cp.diff(np.concatenate(([0], mask.astype(int), [0])))
+            consecutive_bases = cp.diff(cp.concatenate(([0], mask.astype(int), [0])))
             start_positions = cp.where(consecutive_bases == 1)[0]
             end_positions = cp.where(consecutive_bases == -1)[0]
             lengths = end_positions - start_positions
