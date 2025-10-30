@@ -108,7 +108,10 @@ def get_pairs(isolate_list):
 
 def check_row_for_indel(row, csc_matrix):
     rowstart = csc_matrix.indptr[row]
-    rowend = csc_matrix.indptr[row+1]
+    if rowstart = len(csc_matrix.indptr):
+        rowend = rowstart
+    else:
+        rowend = csc_matrix.indptr[row+1]
     
     row_data = csc_matrix.data[rowstart:rowend]
     
@@ -117,7 +120,10 @@ def check_row_for_indel(row, csc_matrix):
 
 def instantiate_csc_row(row, csc_matrix, reference):
     rowstart = csc_matrix.indptr[row]
-    rowend = csc_matrix.indptr[row+1]
+    if rowstart = len(csc_matrix.indptr):
+        rowend = rowstart
+    else:
+        rowend = csc_matrix.indptr[row+1]
     
     row_data = csc_matrix.data[rowstart:rowend]
     row_indices = csc_matrix.indices[rowstart:rowend]
