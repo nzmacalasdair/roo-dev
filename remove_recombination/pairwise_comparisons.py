@@ -14,72 +14,72 @@ from pairsnp import calculate_snp_matrix, calculate_distance_matrix
 #     else: 
 #         return None
 
-def check_for_big_indel_gpu(byteseq1, byteseq2):
-    gaps1 = cp.sum(cp.asarray(byteseq1) == 45) #45 == ord("-") 
-    gaps2 = cp.sum(cp.asarray(byteseq2) == 45)
-    diff = gaps2 - gaps1
-    if (diff/gaps1.size) > 0.15:
-        return diff
-    else: 
-        return None
+# def check_for_big_indel_gpu(byteseq1, byteseq2):
+#     gaps1 = cp.sum(cp.asarray(byteseq1) == 45) #45 == ord("-") 
+#     gaps2 = cp.sum(cp.asarray(byteseq2) == 45)
+#     diff = gaps2 - gaps1
+#     if (diff/gaps1.size) > 0.15:
+#         return diff
+#     else: 
+#         return None
 
-def get_pairwise_differences(seq1, seq2, gpu):
-    if seq1.size != seq2.size:
-        raise ValueError("Two aligned sequences are of different lengths!")
+# def get_pairwise_differences(seq1, seq2, gpu):
+#     if seq1.size != seq2.size:
+#         raise ValueError("Two aligned sequences are of different lengths!")
     
-    if gpu:
-        seq1 = cp.asarray(seq1)
-        seq2 = cp.asarray(seq2)
-        if check_for_big_indel_gpu == None:
-            diffs = cp.count_nonzero(seq1^seq2)
-            length = seq1.size
-            result = (np.array([diffs.get(), length]))
-            return result
-        else:
-            mask = seq1 != 45
-            consecutive_bases = cp.diff(cp.concatenate((cp.array([0]), 
-                                                        mask.astype(int), 
-                                                        cp.array([0]))))
-            start_positions = cp.where(consecutive_bases == 1)[0]
-            end_positions = cp.where(consecutive_bases == -1)[0]
-            lengths = end_positions - start_positions
+#     if gpu:
+#         seq1 = cp.asarray(seq1)
+#         seq2 = cp.asarray(seq2)
+#         if check_for_big_indel_gpu == None:
+#             diffs = cp.count_nonzero(seq1^seq2)
+#             length = seq1.size
+#             result = (np.array([diffs.get(), length]))
+#             return result
+#         else:
+#             mask = seq1 != 45
+#             consecutive_bases = cp.diff(cp.concatenate((cp.array([0]), 
+#                                                         mask.astype(int), 
+#                                                         cp.array([0]))))
+#             start_positions = cp.where(consecutive_bases == 1)[0]
+#             end_positions = cp.where(consecutive_bases == -1)[0]
+#             lengths = end_positions - start_positions
             
-            longest_seq_index = cp.argmax(lengths)
-            longest_seq_start = start_positions[longest_seq_index]
-            longest_seq_end = end_positions[longest_seq_index]
+#             longest_seq_index = cp.argmax(lengths)
+#             longest_seq_start = start_positions[longest_seq_index]
+#             longest_seq_end = end_positions[longest_seq_index]
             
-            cropped_seq1 = seq1[longest_seq_start:longest_seq_end]
-            cropped_seq2 = seq2[longest_seq_start:longest_seq_end]
+#             cropped_seq1 = seq1[longest_seq_start:longest_seq_end]
+#             cropped_seq2 = seq2[longest_seq_start:longest_seq_end]
             
-            diffs = cp.count_nonzero(cropped_seq1^cropped_seq2)
-            length = cropped_seq1.size
-            result = (np.array([diffs.get(), length]))
-            return result
+#             diffs = cp.count_nonzero(cropped_seq1^cropped_seq2)
+#             length = cropped_seq1.size
+#             result = (np.array([diffs.get(), length]))
+#             return result
             
-    else:    
-        if check_for_big_indel == None:
-            diffs = np.count_nonzero(seq1^seq2)
-            length = seq1.size
-            result = (np.array([diffs, length]))
-            return result
-        else:
-            mask = seq1 != 45
-            consecutive_bases = np.diff(np.concatenate(([0], mask.astype(int), [0])))
-            start_positions = np.where(consecutive_bases == 1)[0]
-            end_positions = np.where(consecutive_bases == -1)[0]
-            lengths = end_positions - start_positions
+#     else:    
+#         if check_for_big_indel == None:
+#             diffs = np.count_nonzero(seq1^seq2)
+#             length = seq1.size
+#             result = (np.array([diffs, length]))
+#             return result
+#         else:
+#             mask = seq1 != 45
+#             consecutive_bases = np.diff(np.concatenate(([0], mask.astype(int), [0])))
+#             start_positions = np.where(consecutive_bases == 1)[0]
+#             end_positions = np.where(consecutive_bases == -1)[0]
+#             lengths = end_positions - start_positions
             
-            longest_seq_index = np.argmax(lengths)
-            longest_seq_start = start_positions[longest_seq_index]
-            longest_seq_end = end_positions[longest_seq_index]
+#             longest_seq_index = np.argmax(lengths)
+#             longest_seq_start = start_positions[longest_seq_index]
+#             longest_seq_end = end_positions[longest_seq_index]
             
-            cropped_seq1 = seq1[longest_seq_start:longest_seq_end]
-            cropped_seq2 = seq2[longest_seq_start:longest_seq_end]
+#             cropped_seq1 = seq1[longest_seq_start:longest_seq_end]
+#             cropped_seq2 = seq2[longest_seq_start:longest_seq_end]
             
-            diffs = np.count_nonzero(cropped_seq1^cropped_seq2)
-            length = cropped_seq1.size
-            result = (np.array([diffs, length]))
-            return result
+#             diffs = np.count_nonzero(cropped_seq1^cropped_seq2)
+#             length = cropped_seq1.size
+#             result = (np.array([diffs, length]))
+#             return result
         
         
 
@@ -108,7 +108,7 @@ def get_pairs(isolate_list):
 
 def check_row_for_indel(row, csc_matrix):
     rowstart = csc_matrix.indptr[row]
-    if rowstart == len(csc_matrix.indptr):
+    if rowstart == len(csc_matrix.indptr) + 1:
         rowend = rowstart
     else:
         rowend = csc_matrix.indptr[row+1]
@@ -120,7 +120,7 @@ def check_row_for_indel(row, csc_matrix):
 
 def instantiate_csc_row(row, csc_matrix, reference):
     rowstart = csc_matrix.indptr[row]
-    if rowstart == len(csc_matrix.indptr):
+    if rowstart == len(csc_matrix.indptr) + 1:
         rowend = rowstart
     else:
         rowend = csc_matrix.indptr[row+1]
