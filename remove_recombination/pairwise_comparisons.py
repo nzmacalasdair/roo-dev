@@ -133,7 +133,7 @@ def get_gene_lengths(sparse_matrix, consensus):
     total_aln_len = sparse_matrix.shape[1]
     isolate_count = sparse_matrix.shape[0]
     
-    nongap_lengths = np.zeroes(isolate_count, dtype = int)
+    nongap_lengths = np.zeros(isolate_count, dtype = int)
     
     biggap_in_ref = False
     ref_nogap_length = -1
