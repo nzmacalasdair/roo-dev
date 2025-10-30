@@ -83,7 +83,7 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads, gpu)
         #seqnames.append(iso_names)
     print("Calculating all pairwise differences...")
     allval_pairwise = Parallel(n_jobs=threads, prefer="processes")(
-         delayed(get_pangenome_pairwise_differences)(alignments)
+         delayed(get_pangenome_pairwise_differences)(alignment)
          for alignment in tqdm(filtered_alignment_paths))
     
     #reformat this data to the expected output format
