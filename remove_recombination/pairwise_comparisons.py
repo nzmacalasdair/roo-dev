@@ -176,7 +176,7 @@ def get_gene_lengths(sparse_matrix, consensus):
 
 
 #Spare matricies -- no gpu
-def get_pangenome_pairwise_differences(gene_alignment, isolates):    
+def get_pangenome_pairwise_differences(gene_alignment):    
     sparse_matrix, consensus, seq_names = calculate_snp_matrix(gene_alignment)
     gene_diffs = calculate_distance_matrix(sparse_matrix, consensus, "dist", False)
     gene_lens = get_gene_lengths(sparse_matrix, consensus)
