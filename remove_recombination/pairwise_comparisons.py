@@ -163,7 +163,7 @@ def get_gene_lengths(sparse_matrix, consensus):
             #then count the gaps in the filled out row
             #this is presumably most expensive so better to do other simpler
             #operations first
-            row_sequence = instantiate_csc_row(row_index, sparse_matrix, consensus)
+            row_sequence = instantiate_csr_row(row_index, sparse_matrix, consensus)
             gapcount = np.where(row_sequence == 110)[0]
             if gapcount/total_aln_len > 0.15:
                 row_sequence_length = len(row_sequence[row_sequence != 110])
