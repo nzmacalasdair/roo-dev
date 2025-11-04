@@ -106,27 +106,21 @@ def get_pairs(isolate_list):
     
 #     return (diffs, gene_lens)
 
-def check_row_for_indel(row, csc_matrix):
-    rowstart = csc_matrix.indptr[row]
-    if rowstart == len(csc_matrix.indptr) - 1:
-        rowend = rowstart
-    else:
-        rowend = csc_matrix.indptr[row+1]
+def check_row_for_indel(row, csr_matrix):
+    rowstart = csr_matrix.indptr[row]
+    rowend = csr_matrix.indptr[row+1]
     
-    row_data = csc_matrix.data[rowstart:rowend]
+    row_data = csr_matrix.data[rowstart:rowend]
     
     gap_count = np.sum(row_data == 110)
     return gap_count 
 
-def instantiate_csc_row(row, csc_matrix, reference):
-    rowstart = csc_matrix.indptr[row]
-    if rowstart == len(csc_matrix.indptr) -1 :
-        rowend = rowstart
-    else:
-        rowend = csc_matrix.indptr[row+1]
+def instantiate_csr_row(row, csr_matrix, reference):
+    rowstart = csr_matrix.indptr[row]
+    rowend = csr_matrix.indptr[row+1]
     
-    row_data = csc_matrix.data[rowstart:rowend]
-    row_indices = csc_matrix.indices[rowstart:rowend]
+    row_data = csr_matrix.data[rowstart:rowend]
+    row_indices = csr_matrix.indices[rowstart:rowend]
     
     row_sequence = reference.copy()
     
