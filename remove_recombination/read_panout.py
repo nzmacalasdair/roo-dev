@@ -102,9 +102,10 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads, gpu)
         alignment_isolate_row_lookup_dics.append(row_lookup_dic)
     
     #Go through all pairs and get distances/lengths
+    print("Collating genes for each isolate pair...")
     pairids = ["-".join(x) for x in pairs]
     pair_diff_len_distributions = {}
-    for index in range(len(pairs)):
+    for index in tqdm(range(len(pairs))):
         iso1 = pairs[index][0]
         iso2 = pairs[index][1]
         shared_genes = isolate_gene_indices[iso1] & isolate_gene_indices[iso2]
