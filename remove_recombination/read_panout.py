@@ -97,7 +97,7 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads, gpu)
         isolate_ids = [x.split(";")[0] for x in seqids]
         for isolate in isolate_ids:
             isolate_gene_indices[isolate] = isolate_gene_indices.get(isolate, 
-                                                        set()) | set(gene_idx)
+                                                        set()) | {gene_idx}
         row_lookup_dic = {value: index for index, value in enumerate(isolate_ids)}
         alignment_isolate_row_lookup_dics.append(row_lookup_dic)
     
@@ -111,8 +111,8 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads, gpu)
         gene_dists =[]
         gene_lens = []
         for gene in shared_genes:
-            iso1_row = isolate_gene_indices[gene][iso1]
-            iso2_row = isolate_gene_indices[gene][iso2]
+            iso1_row = alignment_isolate_row_lookup_dics[gene][iso1]
+            iso2_row = alignment_isolate_row_lookup_dics[gene][iso2]
             dist = allval_pairwise[gene][0][iso1_row,iso2_row]
             if dist != allval_pairwise[gene][0][iso2_row,iso1_row]:
                 raise ValueError("Reverse pairwise dists not equal!")

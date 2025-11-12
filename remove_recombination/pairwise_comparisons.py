@@ -1,6 +1,6 @@
 import numpy as np
 
-import cupy as cp
+#import cupy as cp
 
 from pairsnp import calculate_snp_matrix, calculate_distance_matrix
 
@@ -142,7 +142,7 @@ def get_gene_lengths(sparse_matrix, consensus):
         if row_index == 0: #first row is 'ref' for snps so must be done alone
             gappositions = np.where(consensus == 110)[0]
             gapcount = len(gappositions)
-            if gapcount/total_aln_len > 0.15:
+            if (gapcount/total_aln_len) > 0.15:
                 biggap_in_ref = True
                 ref_nogap_length = len(consensus[consensus!= 110])
                 nongap_lengths[row_index] = ref_nogap_length
@@ -164,7 +164,8 @@ def get_gene_lengths(sparse_matrix, consensus):
             #this is presumably most expensive so better to do other simpler
             #operations first
             row_sequence = instantiate_csr_row(row_index, sparse_matrix, consensus)
-            gapcount = np.where(row_sequence == 110)[0]
+            gappositions = np.where(row_sequence == 110)[0]
+            gapcount = len(gappositions)
             if gapcount/total_aln_len > 0.15:
                 row_sequence_length = len(row_sequence[row_sequence != 110])
                 nongap_lengths[row_index] = row_sequence_length
