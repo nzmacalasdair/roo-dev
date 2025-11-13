@@ -184,26 +184,26 @@ def get_pangenome_pairwise_differences(gene_alignment):
     
     return (gene_diffs, gene_lens, seq_names)
 
-def collate_pair_comparisons(pair, isolate_genes, aln_row_lookup, 
-                             pairwise_results, all_gene_names):
-    iso1 = pair[0]
-    iso2 = pair[1]
-    shared_genes = isolate_genes[iso1] & isolate_genes[iso2]
+# def collate_pair_comparisons(pair, isolate_genes, aln_row_lookup, 
+#                              pairwise_results, all_gene_names):
+#     iso1 = pair[0]
+#     iso2 = pair[1]
+#     shared_genes = isolate_genes[iso1] & isolate_genes[iso2]
     
-    gene_dists =[]
-    gene_lens = []
-    gene_names = []
+#     gene_dists =[]
+#     gene_lens = []
+#     gene_names = []
     
-    for gene in shared_genes:
-        iso1_row = aln_row_lookup[gene][iso1]
-        iso2_row = aln_row_lookup[gene][iso2]
-        dist = pairwise_results[gene][0][iso1_row,iso2_row]
-        if dist != pairwise_results[gene][0][iso2_row,iso1_row]:
-            raise ValueError("Reverse pairwise dists not equal! Matrix Error!")
-        length1 = pairwise_results[gene][1][iso1_row]
-        length2 = pairwise_results[gene][1][iso2_row]
-        comparisonlen = min(length1, length2)
-        gene_dists.append(dist)
-        gene_lens.append(comparisonlen)
-        gene_names.append(all_gene_names[gene])
-    return(gene_names, gene_dists, gene_lens)
+#     for gene in shared_genes:
+#         iso1_row = aln_row_lookup[gene][iso1]
+#         iso2_row = aln_row_lookup[gene][iso2]
+#         dist = pairwise_results[gene][0][iso1_row,iso2_row]
+#         if dist != pairwise_results[gene][0][iso2_row,iso1_row]:
+#             raise ValueError("Reverse pairwise dists not equal! Matrix Error!")
+#         length1 = pairwise_results[gene][1][iso1_row]
+#         length2 = pairwise_results[gene][1][iso2_row]
+#         comparisonlen = min(length1, length2)
+#         gene_dists.append(dist)
+#         gene_lens.append(comparisonlen)
+#         gene_names.append(all_gene_names[gene])
+#     return(gene_names, gene_dists, gene_lens)
