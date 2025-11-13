@@ -104,27 +104,40 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads, gpu)
     #Go through all pairs and get distances/lengths
     print("Collating genes for each isolate pair...")
     pairids = ["-".join(x) for x in pairs]
-    pair_diff_len_distributions = {}
-    for index in tqdm(range(len(pairs))):
-        iso1 = pairs[index][0]
-        iso2 = pairs[index][1]
-        shared_genes = isolate_gene_indices[iso1] & isolate_gene_indices[iso2]
-        gene_dists =[]
-        gene_lens = []
-        for gene in shared_genes:
-            iso1_row = alignment_isolate_row_lookup_dics[gene][iso1]
-            iso2_row = alignment_isolate_row_lookup_dics[gene][iso2]
-            dist = allval_pairwise[gene][0][iso1_row,iso2_row]
-            if dist != allval_pairwise[gene][0][iso2_row,iso1_row]:
-                raise ValueError("Reverse pairwise dists not equal!")
-            length1 = allval_pairwise[gene][1][iso1_row]
-            length2 = allval_pairwise[gene][1][iso2_row]
-            comparisonlen = min(length1, length2)
-            gene_dists.append(dist)
-            gene_lens.append(comparisonlen)
-        pair_diff_len_distributions[pairids[index]] = (gene_dists, gene_lens)
     
-    return gene_names, pair_diff_len_distributions    
+    pair_diff_len_distributions = Parallel(n_jobs=threads, prefer="processes")(
+        collate_pair_comparisons(pairs[index], isolate_gene_indices, 
+                                 alignment_isolate_row_lookup_dics, 
+                                 allval_pairwise, gene_names) 
+                            for index in tqdm(range(len(pairs))))
+    ##Legacy single threaded code
+    # pair_diff_len_distributions = {}
+    # pair_gene_names = {}
+
+    # for index in tqdm(range(len(pairs))):
+    #     iso1 = pairs[index][0]
+    #     iso2 = pairs[index][1]
+    #     shared_genes = isolate_gene_indices[iso1] & isolate_gene_indices[iso2]
+    #     gene_dists =[]
+    #     gene_lens = []
+    #     isolate_gene_names = []
+    #     for gene in shared_genes:
+    #         name = gene_names[gene]
+    #         iso1_row = alignment_isolate_row_lookup_dics[gene][iso1]
+    #         iso2_row = alignment_isolate_row_lookup_dics[gene][iso2]
+    #         dist = allval_pairwise[gene][0][iso1_row,iso2_row]
+    #         if dist != allval_pairwise[gene][0][iso2_row,iso1_row]:
+    #             raise ValueError("Reverse pairwise dists not equal!")
+    #         length1 = allval_pairwise[gene][1][iso1_row]
+    #         length2 = allval_pairwise[gene][1][iso2_row]
+    #         comparisonlen = min(length1, length2)
+    #         gene_dists.append(dist)
+    #         gene_lens.append(comparisonlen)
+    #         isolate_gene_names.append(name)
+    #     pair_gene_names[pairids[index]] = gene_names
+    #     pair_diff_len_distributions[pairids[index]] = (gene_dists, gene_lens)
+    
+    return zip(pairids, pair_diff_len_distributions)    
 
 def parse_pangenome(output_dir, threads, use_gpu):
     if output_dir[-1] != "/":
@@ -170,10 +183,10 @@ def parse_pangenome(output_dir, threads, use_gpu):
                 genes.remove(name)
     #Get all the distributions of pairwise differences
     
-    ordered_genes, pairwise_differences = get_all_pairwise_diffs(pairs, genes, 
+    pairs, pairwise_differences = get_all_pairwise_diffs(pairs, genes, 
                                                 gene_alignments_dir, threads, use_gpu)
 
-    return(genes, pairwise_differences)
+    return(pairs, pairwise_differences)
 
 def write_rm_estimate(rm_regression, output_dir):
     outline1 = "Collection r/m estimate: " + str(rm_regression[0])

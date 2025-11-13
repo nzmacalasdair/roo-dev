@@ -12,17 +12,18 @@ from scipy import optimize
 def order_pairwise_diffs(pairwise_matrices):
     all_ordered_diffs = []
     for pair in pairwise_matrices:
-        genes = pairwise_matrices[pair][1] 
-        pairwise = pairwise_matrices[pair][0]
+        genes = np.array(pairwise_matrices[pair][0])
+        pairwise = np.array(pairwise_matrices[pair][1:2])
         try:
             proportion = pairwise[:,0] / pairwise[:,1]
         except Exception as e:
             print(e)
             print(pairwise)
+            print(genes)
             import sys
             sys.exit()
         ordered = pairwise[proportion.argsort()]
-        ordered_genes = np.array(genes)[proportion.argsort()]
+        ordered_genes = genes[proportion.argsort()]
         all_ordered_diffs.append((pair, ordered, ordered_genes))
     return all_ordered_diffs
 
