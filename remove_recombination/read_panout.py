@@ -106,7 +106,7 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads, gpu)
     pairids = ["-".join(x) for x in pairs]
     
     pair_diff_len_distributions = Parallel(n_jobs=threads, prefer="processes")(
-        collate_pair_comparisons(pairs[index], isolate_gene_indices, 
+        delayed(collate_pair_comparisons)(pairs[index], isolate_gene_indices, 
                                  alignment_isolate_row_lookup_dics, 
                                  allval_pairwise, gene_names) 
                             for index in tqdm(range(len(pairs))))
