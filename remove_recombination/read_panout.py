@@ -32,55 +32,10 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads, gpu)
         name = file.split(".")[0]
         if name in filt_genes:
             filtered_alignment_names.append(file)
-    gene_names = [x.split(".")[0] for x in filtered_alignment_names]
+    gene_names = np.aray([x.split(".")[0] for x in filtered_alignment_names])
     
     filtered_alignment_paths = [alignment_directory + x for x in filtered_alignment_names]
-    #sequences = Parallel(n_jobs=threads, prefer="threads")(
-        #delayed(read_and_close_fasta)(x) for x in tqdm(filtered_alignment_paths))
-    #sequences = [SeqIO.parse(x, 'fasta') for x in filtered_alignment_paths]
-    #sequences = [list(x) for x in sequences]
 
-    #preprocess alignments to remove gene ids, only keep isolate ids
-    #also format alignments object as dic to enable fast lookup
-    # alignments_dics = []   
-    # for alignment in sequences:
-    #     lookup_dic = {}
-    #     for sequence in alignment:
-    #         sequence.id = sequence.id.split(";")[0]
-    #         bitseq = np.frombuffer(str(sequence.seq).lower().encode('ascii'),
-    #                                dtype=np.uint8)
-    #         lookup_dic[sequence.id] =  bitseq
-    #     alignments_dics.append(lookup_dic)
-    
-    # alignments = [(alignments_dics[x], 
-    #                filtered_alignment_names[x]) for x in range(len(sequences))]
-    
-    ##Legacy single-threaded code
-    # alignments = []
-    # for alignment in filtered_alignment_names:
-    #     alignfile = alignment_directory + alignment
-    #     sequences = list(SeqIO.parse(alignfile, 'fasta'))
-    #     alignments.append((sequences, alignment))
-    #    
-    #for pair in pairs:
-    #    pairid = "-".join(pair)
-    #    pair_diff_len_distributions[pairid] = get_pangenome_pairwise_differences(alignments, pair)
-   
-    #Legacy pairwise code -- no compute all pairwise differences first
-    # print("Calculating pairwise distances...")
-    # diffs_lens = Parallel(n_jobs=threads, prefer="processes")(
-    #     delayed(get_pangenome_pairwise_differences)(alignments, pair, gpu)
-    #     for pair in tqdm(pairs))
-    
-    #Single-threaded
-    #all_diffs = []
-    #all_lens = []
-    #seqnames = []
-    #for alignment in alignments:
-        #diffs, lens, iso_names, = get_pangenome_pairwise_differences(alignments)
-        #all_diffs.append(diffs)
-        #all_lens.append(lens)
-        #seqnames.append(iso_names)
     print("Calculating all pairwise differences...")
     allval_pairwise = Parallel(n_jobs=threads, prefer="processes")(
          delayed(get_pangenome_pairwise_differences)(alignment)
@@ -117,12 +72,11 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads, gpu)
         #iso1 = pairs[index][0]
         #iso2 = pairs[index][1]
         shared_genes = isolate_gene_indices[iso1] & isolate_gene_indices[iso2]
-        isolate_gene_names = []
+        isolate_gene_names = gene_names[shared_genes]
         gene_dists =[]
         gene_lens = []
-        for gene in shared_genes:
-            name = gene_names[gene]
-            
+        
+        for gene in shared_genes:            
             generows = alignment_isolate_row_lookup_dics[gene]
             iso1_row = generows[iso1]
             iso2_row = generows[iso2]
@@ -139,7 +93,6 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads, gpu)
             
             gene_dists.append(dist)
             gene_lens.append(comparisonlen)
-            isolate_gene_names.append(name)
         pair_diff_len_distributions.append((isolate_gene_names, 
                                            gene_dists, gene_lens))
     
