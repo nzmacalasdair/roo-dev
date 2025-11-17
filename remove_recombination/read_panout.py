@@ -69,14 +69,22 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads, gpu)
         iso1_alnrows = np.array([alignment_isolate_row_lookup_dics[gene][iso1] for gene in shared_genes])
         iso2_alnrows = np.array([alignment_isolate_row_lookup_dics[gene][iso2] for gene in shared_genes])
         
-        dist_matrices = np.stack([allval_pairwise[gene][0] for gene in shared_genes])
-        length_matrices = np.stack([allval_pairwise[gene][1] for gene in shared_genes])
+        dist_matrices = [allval_pairwise[gene][0] for gene in shared_genes]
+        length_matrices = [allval_pairwise[gene][1] for gene in shared_genes]
         
                
         isolate_gene_names = gene_names[shared_genes]
-        gene_dists = np.array([dist_matrices[gene, iso1_alnrows, iso2_alnrows] for gene in range(len(shared_genes))])
-        gene_lens = np.minimum(np.array([length_matrices[gene, iso1_alnrows] for gene in range(len(shared_genes))]), 
-                           np.array([length_matrices[gene, iso2_alnrows] for gene in range(len(shared_genes))]))
+        gene_dists = np.array([
+                    dist_matrices[i][r1, r2]
+                    for i, r1, r2 in zip(range(len(shared_genes)),
+                                         iso1_alnrows, iso2_alnrows)
+                ])
+        gene_lens = np.minimum(np.array([length_matrices[i][r1] 
+                                         for i, r1 in 
+                                         zip(range(len(shared_genes)), iso1_alnrows)]), 
+                           np.array([length_matrices[i][r2] 
+                                     for i, r2 in 
+                                     zip(range(len(shared_genes)), iso2_alnrows)]))
         
         #Do I need this debug check?
         # if not np.all(gene_dists == dist_matrices[np.arange(len(shared_genes)), 
