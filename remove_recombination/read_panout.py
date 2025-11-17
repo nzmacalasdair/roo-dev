@@ -56,7 +56,7 @@ def parallel_collate_pairs(pairs, isolate_gene_indices,
     
     with ProcessPoolExecutor(max_workers=n_cpu) as executor:
         results = executor.map(
-            process_pair, 
+            collate_pair, 
             (iso1 for iso1, iso2 in pairs), 
             (iso2 for iso1, iso2 in pairs),
             [isolate_gene_indices]*len(pairs),
@@ -65,7 +65,7 @@ def parallel_collate_pairs(pairs, isolate_gene_indices,
             [gene_names]*len(pairs)
         )
         
-        for result in tqdm(results, total=len(pairs), desc="Processing Pairs"):
+        for result in tqdm(results, total=len(pairs)):
             pair_diff_len_distributions.append(result)
     
     return pair_diff_len_distributions
