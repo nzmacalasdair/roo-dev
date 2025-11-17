@@ -71,7 +71,7 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads, gpu)
     for iso1, iso2 in tqdm(pairs):
         #iso1 = pairs[index][0]
         #iso2 = pairs[index][1]
-        shared_genes = isolate_gene_indices[iso1] & isolate_gene_indices[iso2]
+        shared_genes = list(isolate_gene_indices[iso1] & isolate_gene_indices[iso2])
         isolate_gene_names = gene_names[shared_genes]
         gene_dists =[]
         gene_lens = []
