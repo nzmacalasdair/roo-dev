@@ -78,9 +78,9 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads, gpu)
         print(length_matrices.shape)
         
         isolate_gene_names = gene_names[shared_genes]
-        gene_dists = dist_matrices[np.arange(len(shared_genes)), iso1_alnrows, iso2_alnrows]
-        gene_lens = np.minimum(length_matrices[np.arange(len(shared_genes)), iso1_alnrows], 
-                           length_matrices[np.arange(len(shared_genes)), iso2_alnrows])
+        gene_dists = np.array([dist_matrices[gene][iso1_alnrows, iso2_alnrows] for gene in shared_genes])
+        gene_lens = np.minimum(np.array([length_matrices[gene][iso1_alnrows] for gene in shared_genes]), 
+                           np.array([length_matrices[gene][iso2_alnrows] for gene in shared_genes]))
         
         #Do I need this debug check?
         if not np.all(gene_dists == dist_matrices[np.arange(len(shared_genes)), 
