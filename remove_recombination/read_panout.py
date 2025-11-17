@@ -108,44 +108,44 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads, gpu)
     print("Collating genes for each isolate pair...")
     pairids = ["-".join(x) for x in pairs]
     
-    pair_diff_len_distributions = parallel_collate_pairs(pairs, 
-                                                         isolate_gene_indices, 
-                                                         alignment_isolate_row_lookup_dics, 
-                                                         allval_pairwise, 
-                                                         gene_names, threads)
+    # pair_diff_len_distributions = parallel_collate_pairs(pairs, 
+    #                                                      isolate_gene_indices, 
+    #                                                      alignment_isolate_row_lookup_dics, 
+    #                                                      allval_pairwise, 
+    #                                                      gene_names, threads)
     
-    ##Single threaded code is faster?
-    #pair_diff_len_distributions = []
-    # for iso1, iso2 in tqdm(pairs):
+    #Single threaded code is faster, again
+    pair_diff_len_distributions = []
+    for iso1, iso2 in tqdm(pairs):
      
-    #     shared_genes = list(isolate_gene_indices[iso1] & isolate_gene_indices[iso2])
+        shared_genes = list(isolate_gene_indices[iso1] & isolate_gene_indices[iso2])
         
-    #     iso1_alnrows = np.array([alignment_isolate_row_lookup_dics[gene][iso1] for gene in shared_genes])
-    #     iso2_alnrows = np.array([alignment_isolate_row_lookup_dics[gene][iso2] for gene in shared_genes])
+        iso1_alnrows = np.array([alignment_isolate_row_lookup_dics[gene][iso1] for gene in shared_genes])
+        iso2_alnrows = np.array([alignment_isolate_row_lookup_dics[gene][iso2] for gene in shared_genes])
         
-    #     dist_matrices = [allval_pairwise[gene][0] for gene in shared_genes]
-    #     length_matrices = [allval_pairwise[gene][1] for gene in shared_genes]
+        dist_matrices = [allval_pairwise[gene][0] for gene in shared_genes]
+        length_matrices = [allval_pairwise[gene][1] for gene in shared_genes]
         
                
-    #     isolate_gene_names = gene_names[shared_genes]
-    #     gene_dists = np.array([
-    #                 dist_matrices[i][r1, r2]
-    #                 for i, r1, r2 in zip(range(len(shared_genes)),
-    #                                      iso1_alnrows, iso2_alnrows)
-    #             ])
-    #     gene_lens = np.minimum(np.array([length_matrices[i][r1] 
-    #                                      for i, r1 in 
-    #                                      zip(range(len(shared_genes)), iso1_alnrows)]), 
-    #                        np.array([length_matrices[i][r2] 
-    #                                  for i, r2 in 
-    #                                  zip(range(len(shared_genes)), iso2_alnrows)]))
+        isolate_gene_names = gene_names[shared_genes]
+        gene_dists = np.array([
+                    dist_matrices[i][r1, r2]
+                    for i, r1, r2 in zip(range(len(shared_genes)),
+                                          iso1_alnrows, iso2_alnrows)
+                ])
+        gene_lens = np.minimum(np.array([length_matrices[i][r1] 
+                                          for i, r1 in 
+                                          zip(range(len(shared_genes)), iso1_alnrows)]), 
+                            np.array([length_matrices[i][r2] 
+                                      for i, r2 in 
+                                      zip(range(len(shared_genes)), iso2_alnrows)]))
         
-        #Do I need this debug check?
+        # Do I need this debug check?
         # if not np.all(gene_dists == dist_matrices[np.arange(len(shared_genes)), 
         #                                           iso2_alnrows, iso1_alnrows]):
         #     raise ValueError("Reverse pairwise distances are not equal!")
         
-        #avoid this loop if I can
+        # avoid this loop if I can
         # for gene in shared_genes:            
             
         #     dist_matrix = allval_pairwise[gene][0]
@@ -162,8 +162,8 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads, gpu)
         #     gene_lens.append(comparisonlen)
         
         
-        #pair_diff_len_distributions.append((isolate_gene_names, 
-        #                                   gene_dists, gene_lens))
+        pair_diff_len_distributions.append((isolate_gene_names, 
+                                          gene_dists, gene_lens))
     
     
     if len(pairids) != len(pair_diff_len_distributions):
