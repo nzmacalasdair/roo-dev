@@ -60,47 +60,53 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads, gpu)
     print("Collating genes for each isolate pair...")
     pairids = ["-".join(x) for x in pairs]
     
-    ##Multithreaded code slower due to overhead!
-    # pair_diff_len_distributions = Parallel(n_jobs=threads, prefer="processes")(
-    #     delayed(collate_pair_comparisons)(pairs[index], isolate_gene_indices, 
-    #                              alignment_isolate_row_lookup_dics, 
-    #                              allval_pairwise, gene_names) 
-    #                         for index in tqdm(range(len(pairs))))
-    ##Single threaded code
+    ##Single threaded code is faster
     pair_diff_len_distributions = []
     for iso1, iso2 in tqdm(pairs):
-        #iso1 = pairs[index][0]
-        #iso2 = pairs[index][1]
+     
         shared_genes = list(isolate_gene_indices[iso1] & isolate_gene_indices[iso2])
         
+        iso1_alnrows = np.array([alignment_isolate_row_lookup_dics[gene][iso1] for gene in shared_genes])
+        iso2_alnrows = np.array([alignment_isolate_row_lookup_dics[gene][iso2] for gene in shared_genes])
         
+        dist_matrices = np.array([allval_pairwise[gene][0] for gene in shared_genes])
+        length_matrices = np.array([allval_pairwise[gene][1] for gene in shared_genes])
         
         
         isolate_gene_names = gene_names[shared_genes]
-        gene_dists =[]
-        gene_lens = []
+        gene_dists = dist_matrices[np.arange(len(shared_genes)), iso1_alnrows, iso2_alnrows]
+        gene_lens = np.minimum(length_matrices[np.arange(len(shared_genes)), iso1_alnrows], 
+                           length_matrices[np.arange(len(shared_genes)), iso2_alnrows])
         
-        for gene in shared_genes:            
-            generows = alignment_isolate_row_lookup_dics[gene]
-            iso1_row = generows[iso1]
-            iso2_row = generows[iso2]
+        #Do I need this debug check?
+        if not np.all(gene_dists == dist_matrices[np.arange(len(shared_genes)), 
+                                                  iso2_alnrows, iso1_alnrows]):
+            raise ValueError("Reverse pairwise distances are not equal!")
+        
+        #avoid this loop if I can
+        # for gene in shared_genes:            
             
-            dist_matrix = allval_pairwise[gene][0]
-            dist = dist_matrix[iso1_row,iso2_row]
-            if dist != dist_matrix[iso2_row,iso1_row]:
-                raise ValueError("Reverse pairwise dists not equal!")
+        #     dist_matrix = allval_pairwise[gene][0]
+        #     dist = dist_matrix[iso1_row,iso2_row]
+        #     if dist != dist_matrix[iso2_row,iso1_row]:
+        #         raise ValueError("Reverse pairwise dists not equal!")
             
-            length_matrix = allval_pairwise[gene][1]
-            length1 = length_matrix[iso1_row]
-            length2 = length_matrix[iso2_row]
-            comparisonlen = min(length1, length2)
+        #     length_matrix = allval_pairwise[gene][1]
+        #     length1 = length_matrix[iso1_row]
+        #     length2 = length_matrix[iso2_row]
+        #     comparisonlen = min(length1, length2)
             
-            gene_dists.append(dist)
-            gene_lens.append(comparisonlen)
+        #     gene_dists.append(dist)
+        #     gene_lens.append(comparisonlen)
+        
+        
         pair_diff_len_distributions.append((isolate_gene_names, 
                                            gene_dists, gene_lens))
     
-    return zip(pairids, pair_diff_len_distributions)    
+    
+    if len(pairids) != len(pair_diff_len_distributions):
+        raise ValueError("Pairwise comparisons not equal to number of pairs!")
+    return pairids, pair_diff_len_distributions    
 
 def parse_pangenome(output_dir, threads, use_gpu):
     if output_dir[-1] != "/":
@@ -149,7 +155,7 @@ def parse_pangenome(output_dir, threads, use_gpu):
     pairs, pairwise_differences = get_all_pairwise_diffs(pairs, genes, 
                                                 gene_alignments_dir, threads, use_gpu)
 
-    return(pairs, pairwise_differences)
+    return pairs, pairwise_differences
 
 def write_rm_estimate(rm_regression, output_dir):
     outline1 = "Collection r/m estimate: " + str(rm_regression[0])

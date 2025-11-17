@@ -1,5 +1,6 @@
 import math
 
+from tqdm import tqdm
 import numpy as np
 
 import scipy.special as sp
@@ -11,9 +12,10 @@ from scipy import optimize
 
 def order_pairwise_diffs(pairwise_matrices):
     all_ordered_diffs = []
-    for pair in pairwise_matrices:
-        genes = np.array(pairwise_matrices[pair][0])
-        pairwise = np.array(pairwise_matrices[pair][1:2])
+    print("Ordering pairwise gene differences...")
+    for pair in tqdm(pairwise_matrices):
+        genes = pair[0]
+        pairwise = pair[1:2]
         try:
             proportion = pairwise[:,0] / pairwise[:,1]
         except Exception as e:
