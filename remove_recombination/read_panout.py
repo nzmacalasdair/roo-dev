@@ -1,4 +1,5 @@
 import os
+import cProfile
 
 from joblib import Parallel, delayed
 
@@ -160,8 +161,7 @@ def parse_pangenome(output_dir, threads, use_gpu):
                 genes.remove(name)
     #Get all the distributions of pairwise differences
     
-    pairs, pairwise_differences = get_all_pairwise_diffs(pairs, genes, 
-                                                gene_alignments_dir, threads, use_gpu)
+    pairs, pairwise_differences = cProfile.run("get_all_pairwise_diffs(pairs, genes, gene_alignments_dir, threads, use_gpu)")
 
     return pairs, pairwise_differences
 
