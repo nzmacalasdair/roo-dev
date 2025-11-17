@@ -72,20 +72,16 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads, gpu)
         dist_matrices = [allval_pairwise[gene][0] for gene in shared_genes]
         length_matrices = [allval_pairwise[gene][1] for gene in shared_genes]
         
-        dist_matrices = np.array(dist_matrices)
-        length_matrices = np.array(length_matrices)
-        print(dist_matrices.shape)
-        print(length_matrices.shape)
-        
+               
         isolate_gene_names = gene_names[shared_genes]
         gene_dists = np.array([dist_matrices[gene][iso1_alnrows, iso2_alnrows] for gene in shared_genes])
         gene_lens = np.minimum(np.array([length_matrices[gene][iso1_alnrows] for gene in shared_genes]), 
                            np.array([length_matrices[gene][iso2_alnrows] for gene in shared_genes]))
         
         #Do I need this debug check?
-        if not np.all(gene_dists == dist_matrices[np.arange(len(shared_genes)), 
-                                                  iso2_alnrows, iso1_alnrows]):
-            raise ValueError("Reverse pairwise distances are not equal!")
+        # if not np.all(gene_dists == dist_matrices[np.arange(len(shared_genes)), 
+        #                                           iso2_alnrows, iso1_alnrows]):
+        #     raise ValueError("Reverse pairwise distances are not equal!")
         
         #avoid this loop if I can
         # for gene in shared_genes:            
