@@ -32,7 +32,7 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads, gpu)
         name = file.split(".")[0]
         if name in filt_genes:
             filtered_alignment_names.append(file)
-    gene_names = np.aray([x.split(".")[0] for x in filtered_alignment_names])
+    gene_names = np.array([x.split(".")[0] for x in filtered_alignment_names])
     
     filtered_alignment_paths = [alignment_directory + x for x in filtered_alignment_names]
 
@@ -72,6 +72,10 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads, gpu)
         #iso1 = pairs[index][0]
         #iso2 = pairs[index][1]
         shared_genes = list(isolate_gene_indices[iso1] & isolate_gene_indices[iso2])
+        
+        
+        
+        
         isolate_gene_names = gene_names[shared_genes]
         gene_dists =[]
         gene_lens = []
