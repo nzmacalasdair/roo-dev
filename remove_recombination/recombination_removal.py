@@ -68,7 +68,7 @@ def main():
         raise ValueError("Method must be one of [bayesian, frequentist]")
         
     #Load in relevant info from genes
-    pairs, pairwise_differences = cProfile.run(parse_pangenome(args.outdir, args.n_cpu, args.gpu))
+    pairs, pairwise_differences = cProfile.run("parse_pangenome(args.outdir, args.n_cpu, args.gpu)")
     #Order genes from least snps/length to greatest snps/length
     ordered_pairs = order_pairwise_diffs(pairwise_differences)
     
