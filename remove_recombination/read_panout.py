@@ -49,10 +49,12 @@ def collate_pair(iso1, iso2, isolate_gene_indices, alignment_isolate_row_lookup_
     
     return (isolate_gene_names, gene_dists, gene_lens)
 
-def parallel_collate_pairs(pairs, isolate_gene_indices, alignment_isolate_row_lookup_dics, allval_pairwise, gene_names):
+def parallel_collate_pairs(pairs, isolate_gene_indices, 
+                           alignment_isolate_row_lookup_dics, allval_pairwise, 
+                           gene_names, n_cpu):
     pair_diff_len_distributions = []
     
-    with ProcessPoolExecutor() as executor:
+    with ProcessPoolExecutor(max_workers=n_cpu) as executor:
         results = executor.map(
             process_pair, 
             (iso1 for iso1, iso2 in pairs), 
@@ -110,7 +112,7 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads, gpu)
                                                          isolate_gene_indices, 
                                                          alignment_isolate_row_lookup_dics, 
                                                          allval_pairwise, 
-                                                         gene_names)
+                                                         gene_names, threads)
     
     ##Single threaded code is faster?
     #pair_diff_len_distributions = []
