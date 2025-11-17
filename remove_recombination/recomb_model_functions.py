@@ -17,7 +17,7 @@ def order_pairwise_diffs(pairwise_matrices):
         genes = pair[0]
         pairwise = pair[1:2]
         try:
-            proportion = pairwise[:,0] / pairwise[:,1]
+            proportion = pairwise[0] / pairwise[1]
         except Exception as e:
             print(e)
             print(pairwise)
