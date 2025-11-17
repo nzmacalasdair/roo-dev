@@ -15,7 +15,7 @@ def order_pairwise_diffs(pairwise_matrices):
     print("Ordering pairwise gene differences...")
     for pair in tqdm(pairwise_matrices):
         genes = pair[0]
-        pairwise = pair[1:2]
+        pairwise = pair[1:]
         try:
             proportion = pairwise[0] / pairwise[1]
         except Exception as e:
