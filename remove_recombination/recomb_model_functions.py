@@ -19,14 +19,15 @@ def order_pairwise_diffs(pairwise_matrices):
         try:
             proportion = pairwise[0] / pairwise[1]
         except Exception as e:
-            print(e)
-            print(pairwise)
-            print(genes)
+            #print(e)
+            #print(pairwise)
+            #print(genes)
             import sys
-            sys.exit()
-        ordered = pairwise[proportion.argsort()]
+            sys.exit()   
+        ordered = np.column_stack([pairwise[0][proportion.argsort()], 
+                   pairwise[1][proportion.argsort()]])
         ordered_genes = genes[proportion.argsort()]
-        all_ordered_diffs.append((pair, ordered, ordered_genes))
+        all_ordered_diffs.append((ordered, ordered_genes))
     return all_ordered_diffs
 
 def calc_log_likelihood(lengths, diffs, hyp_par_1, hyp_par_2):
@@ -142,7 +143,16 @@ def recombination_analysis_frequentist(pair):
     
     threshold, recombinants = analyse_pair_frequentist(dists, lens, genes)
     
-    mean_distance = sum(dists[:threshold]) / sum(lens[:threshold])
+    try:
+        mean_distance = sum(dists[:threshold]) / sum(lens[:threshold])
+    except:
+        print(threshold)
+        print(dists[:threshold])
+        print(dists)
+        print(lens[:threshold])
+        print(lens)
+        import sys
+        sys.exit()
     
     expec_pg_muts = mean_distance * sum(pair[0][:,1])
     total_dist = sum(pair[0][:,0])
