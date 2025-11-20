@@ -149,9 +149,7 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads, gpu)
                                                           alignment_isolate_row_lookup_dics, 
                                                           allval_pairwise, 
                                                           gene_names, threads)
-      
-    
-    
+        
     #Single threaded code is faster, again
     # pair_diff_len_distributions = []
     # for iso1, iso2 in tqdm(pairs):
