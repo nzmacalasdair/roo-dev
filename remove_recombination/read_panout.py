@@ -1,4 +1,5 @@
 import os
+import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor
 
 from joblib import Parallel, delayed
@@ -24,21 +25,29 @@ def read_and_close_fasta(filename):
        seq_generator = SeqIO.parse(inhandle, 'fasta')
        return list(seq_generator)
 
+# Global variables to avoid pickling
+ISOLATE_GENE_INDICES = None
+ALIGN_ISO_ROW_LOOKUPS = None
+ALLVAL_PAIRWISE = None
+GENE_NAMES = None
 
-def collate_pair(iso1, iso2, isolate_gene_indices, alignment_isolate_row_lookup_dics, allval_pairwise, gene_names):
+
+def collate_pair(iso1, iso2):
     
-    shared_genes = list(isolate_gene_indices[iso1] & isolate_gene_indices[iso2])
+    global ISOLATE_GENE_INDICES, ALIGN_ISO_ROW_LOOKUPS, ALLVAL_PAIRWISE, GENE_NAMES
+    
+    shared_genes = list(ISOLATE_GENE_INDICES[iso1] & ISOLATE_GENE_INDICES[iso2])
     
     # Precompute the row indices for iso1 and iso2 in a single pass
-    iso1_alnrows = np.array([alignment_isolate_row_lookup_dics[gene][iso1] for gene in shared_genes])
-    iso2_alnrows = np.array([alignment_isolate_row_lookup_dics[gene][iso2] for gene in shared_genes])
+    iso1_alnrows = np.array([ALIGN_ISO_ROW_LOOKUPS[gene][iso1] for gene in shared_genes])
+    iso2_alnrows = np.array([ALIGN_ISO_ROW_LOOKUPS[gene][iso2] for gene in shared_genes])
 
     # Precompute the matrices for the shared genes
-    dist_matrices = [allval_pairwise[gene][0] for gene in shared_genes]
-    length_matrices = [allval_pairwise[gene][1] for gene in shared_genes]
+    dist_matrices = [ALLVAL_PAIRWISE[gene][0] for gene in shared_genes]
+    length_matrices = [ALLVAL_PAIRWISE[gene][1] for gene in shared_genes]
     
     # Retrieve gene names directly as a NumPy array
-    isolate_gene_names = gene_names[shared_genes]
+    isolate_gene_names = GENE_NAMES[shared_genes]
     
     # Use advanced indexing and avoid creating extra NumPy arrays
     gene_dists = np.array([dist_matrices[i][r1, r2] for i, r1, r2 in zip(range(len(shared_genes)), iso1_alnrows, iso2_alnrows)])
@@ -49,26 +58,52 @@ def collate_pair(iso1, iso2, isolate_gene_indices, alignment_isolate_row_lookup_
     
     return (isolate_gene_names, gene_dists, gene_lens)
 
-def parallel_collate_pairs(pairs, isolate_gene_indices, 
-                           alignment_isolate_row_lookup_dics, allval_pairwise, 
-                           gene_names, n_cpu):
-    pair_diff_len_distributions = []
-    
-    with ProcessPoolExecutor(max_workers=n_cpu) as executor:
-        results = executor.map(
-            collate_pair, 
-            (iso1 for iso1, iso2 in pairs), 
-            (iso2 for iso1, iso2 in pairs),
-            [isolate_gene_indices]*len(pairs),
-            [alignment_isolate_row_lookup_dics]*len(pairs),
-            [allval_pairwise]*len(pairs),
-            [gene_names]*len(pairs)
+
+def _init_worker(isolate_gene_indices,
+                 alignment_isolate_row_lookup_dics,
+                 allval_pairwise,
+                 gene_names):
+
+    global ISOLATE_GENE_INDICES
+    global ALIGN_ISO_ROW_LOOKUPS
+    global ALLVAL_PAIRWISE
+    global GENE_NAMES
+
+    ISOLATE_GENE_INDICES = isolate_gene_indices
+    ALIGN_ISO_ROW_LOOKUPS = alignment_isolate_row_lookup_dics
+    ALLVAL_PAIRWISE = allval_pairwise
+    GENE_NAMES = gene_names
+
+
+def parallel_collate_pairs(
+    pairs,
+    isolate_gene_indices,
+    alignment_isolate_row_lookup_dics,
+    allval_pairwise,
+    gene_names,
+    n_cpu
+):
+    # Ensure fork mode (only works on POSIX systems)
+    mp.set_start_method("fork", force=True)
+
+    # Only small objects will be sent (the iso1, iso2 pairs)
+    iso1s = [iso1 for iso1, iso2 in pairs]
+    iso2s = [iso2 for iso1, iso2 in pairs]
+
+    with ProcessPoolExecutor(
+        max_workers=n_cpu,
+        initializer=_init_worker,
+        initargs=(
+            isolate_gene_indices,
+            alignment_isolate_row_lookup_dics,
+            allval_pairwise,
+            gene_names
         )
-        
-        for result in tqdm(results, total=len(pairs)):
-            pair_diff_len_distributions.append(result)
-    
-    return pair_diff_len_distributions
+    ) as executor:
+
+        results_iter = executor.map(collate_pair, iso1s, iso2s)
+
+        return list(tqdm(results_iter, total=len(pairs)))
 
 
 def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads, gpu):
@@ -108,37 +143,40 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads, gpu)
     print("Collating genes for each isolate pair...")
     pairids = ["-".join(x) for x in pairs]
     
-    # pair_diff_len_distributions = parallel_collate_pairs(pairs, 
-    #                                                      isolate_gene_indices, 
-    #                                                      alignment_isolate_row_lookup_dics, 
-    #                                                      allval_pairwise, 
-    #                                                      gene_names, threads)
+    #Multithread with new fork backend
+    pair_diff_len_distributions = parallel_collate_pairs(pairs, 
+                                                          isolate_gene_indices, 
+                                                          alignment_isolate_row_lookup_dics, 
+                                                          allval_pairwise, 
+                                                          gene_names, threads)
+      
+    
     
     #Single threaded code is faster, again
-    pair_diff_len_distributions = []
-    for iso1, iso2 in tqdm(pairs):
+    # pair_diff_len_distributions = []
+    # for iso1, iso2 in tqdm(pairs):
      
-        shared_genes = list(isolate_gene_indices[iso1] & isolate_gene_indices[iso2])
+    #     shared_genes = list(isolate_gene_indices[iso1] & isolate_gene_indices[iso2])
         
-        iso1_alnrows = np.array([alignment_isolate_row_lookup_dics[gene][iso1] for gene in shared_genes])
-        iso2_alnrows = np.array([alignment_isolate_row_lookup_dics[gene][iso2] for gene in shared_genes])
+    #     iso1_alnrows = np.array([alignment_isolate_row_lookup_dics[gene][iso1] for gene in shared_genes])
+    #     iso2_alnrows = np.array([alignment_isolate_row_lookup_dics[gene][iso2] for gene in shared_genes])
         
-        dist_matrices = [allval_pairwise[gene][0] for gene in shared_genes]
-        length_matrices = [allval_pairwise[gene][1] for gene in shared_genes]
+    #     dist_matrices = [allval_pairwise[gene][0] for gene in shared_genes]
+    #     length_matrices = [allval_pairwise[gene][1] for gene in shared_genes]
         
                
-        isolate_gene_names = gene_names[shared_genes]
-        gene_dists = np.array([
-                    dist_matrices[i][r1, r2]
-                    for i, r1, r2 in zip(range(len(shared_genes)),
-                                          iso1_alnrows, iso2_alnrows)
-                ])
-        gene_lens = np.minimum(np.array([length_matrices[i][r1] 
-                                          for i, r1 in 
-                                          zip(range(len(shared_genes)), iso1_alnrows)]), 
-                            np.array([length_matrices[i][r2] 
-                                      for i, r2 in 
-                                      zip(range(len(shared_genes)), iso2_alnrows)]))
+    #     isolate_gene_names = gene_names[shared_genes]
+    #     gene_dists = np.array([
+    #                 dist_matrices[i][r1, r2]
+    #                 for i, r1, r2 in zip(range(len(shared_genes)),
+    #                                       iso1_alnrows, iso2_alnrows)
+    #             ])
+    #     gene_lens = np.minimum(np.array([length_matrices[i][r1] 
+    #                                       for i, r1 in 
+    #                                       zip(range(len(shared_genes)), iso1_alnrows)]), 
+    #                         np.array([length_matrices[i][r2] 
+    #                                   for i, r2 in 
+    #                                   zip(range(len(shared_genes)), iso2_alnrows)]))
         
         # Do I need this debug check?
         # if not np.all(gene_dists == dist_matrices[np.arange(len(shared_genes)), 
@@ -160,10 +198,8 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads, gpu)
             
         #     gene_dists.append(dist)
         #     gene_lens.append(comparisonlen)
-        
-        
-        pair_diff_len_distributions.append((isolate_gene_names, 
-                                          gene_dists, gene_lens))
+        # pair_diff_len_distributions.append((isolate_gene_names, 
+        #                                   gene_dists, gene_lens))
     
     
     if len(pairids) != len(pair_diff_len_distributions):
