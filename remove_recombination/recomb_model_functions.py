@@ -13,21 +13,30 @@ from scipy import optimize
 def order_pairwise_diffs(pairwise_matrices):
     all_ordered_diffs = []
     print("Ordering pairwise gene differences...")
+
     for pair in tqdm(pairwise_matrices):
-        genes = pair[0]
-        pairwise = pair[1:]
-        try:
-            proportion = pairwise[0] / pairwise[1]
-        except Exception as e:
-            #print(e)
-            #print(pairwise)
-            #print(genes)
-            import sys
-            sys.exit()   
-        ordered = np.column_stack([pairwise[0][proportion.argsort()], 
-                   pairwise[1][proportion.argsort()]])
-        ordered_genes = genes[proportion.argsort()]
+        genes = pair[0]              # 1D array of gene names
+        dist = pair[1]               # 1D array
+        length = pair[2]             # 1D array
+
+        # Compute proportion using a reusable array to avoid creating temporaries
+        # If division by zero is possible, you can add a mask instead.
+        proportion = dist / length
+
+        # argsort once
+        order = np.argsort(proportion)
+
+        # Reindex *without allocating multiple subarrays*
+        # Use np.empty and fill in-place to reduce peak memory
+        ordered = np.empty((len(dist), 2), dtype=dist.dtype)
+        ordered[:, 0] = dist[order]
+        ordered[:, 1] = length[order]
+
+        # Reindex gene names
+        ordered_genes = genes[order]
+
         all_ordered_diffs.append((ordered, ordered_genes))
+
     return all_ordered_diffs
 
 def calc_log_likelihood(lengths, diffs, hyp_par_1, hyp_par_2):
