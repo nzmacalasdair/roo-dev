@@ -47,7 +47,7 @@ def collate_pair(iso1, iso2):
     length_matrices = [ALLVAL_PAIRWISE[gene][1] for gene in shared_genes]
     
     # Retrieve gene names directly as a NumPy array
-    isolate_gene_names = shared_genes
+    isolate_gene_names = np.array(shared_genes)
     
     # Use advanced indexing and avoid creating extra NumPy arrays
     gene_dists = np.array([dist_matrices[i][r1, r2] for i, r1, r2 in zip(range(len(shared_genes)), iso1_alnrows, iso2_alnrows)])
