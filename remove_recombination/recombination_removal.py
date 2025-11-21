@@ -97,14 +97,15 @@ def main():
     #     pairwise_rm_estimates = dists[2]/dists[1]
     
     #multithreading
+    print("Identifying recombinants...")
     if args.method =="bayesian":
          results = Parallel(n_jobs=args.n_cpu, 
-                                                              prefer="threads")(
+                                                              prefer="process")(
             delayed(recombination_analysis_bayesian)(ordered_pairs[index]) for index in tqdm(range(len(ordered_pairs))))
          pairwise_recombinant_genes, mean_distances = zip(*results)                                                         
     elif args.method == "frequentist":
         results = Parallel(n_jobs=args.n_cpu, 
-                                                              prefer="threads")(
+                                                              prefer="process")(
             delayed(recombination_analysis_frequentist)(ordered_pairs[index]) for index in tqdm(range(len(ordered_pairs)))) 
         pairwise_recombinant_genes, mean_distances = zip(*results)
     #Reformat pairwise results
