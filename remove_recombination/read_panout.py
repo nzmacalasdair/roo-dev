@@ -245,9 +245,9 @@ def parse_pangenome(output_dir, threads, use_gpu):
                 genes.remove(name)
     #Get all the distributions of pairwise differences
     
-    pairs, pairwise_differences = get_all_pairwise_diffs(pairs, genes, gene_alignments_dir, threads, use_gpu)
+    pairs, pairwise_differences, gene_names, = get_all_pairwise_diffs(pairs, genes, gene_alignments_dir, threads, use_gpu)
 
-    return pairs, pairwise_differences
+    return pairs, pairwise_differences, gene_names
 
 def write_rm_estimate(rm_regression, output_dir):
     outline1 = "Collection r/m estimate: " + str(rm_regression[0])
