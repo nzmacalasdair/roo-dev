@@ -67,7 +67,7 @@ def main():
         raise ValueError("Method must be one of [bayesian, frequentist]")
         
     #Load in relevant info from genes
-    pairs, pairwise_differences = parse_pangenome(args.outdir, args.n_cpu, args.gpu)
+    pairs, pairwise_differences, gene_names = parse_pangenome(args.outdir, args.n_cpu, args.gpu)
     
     #Order genes from least snps/length to greatest snps/length
     ordered_pairs = order_pairwise_diffs(pairwise_differences)
@@ -113,7 +113,8 @@ def main():
         pair_dists = mean_distances[index]
         pair = pairs[index] #pair is first position in the tuple
         for gene in pair_recombinants:
-            gene_recombination_dic[gene] = gene_recombination_dic.get(gene,
+            gene_name = gene_names[gene]
+            gene_recombination_dic[gene_name] = gene_recombination_dic.get(gene,
                                                                   []) + [pair]
 
         total_dists[pair] = pair_dists[0]

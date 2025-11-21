@@ -29,12 +29,12 @@ def read_and_close_fasta(filename):
 ISOLATE_GENE_INDICES = None
 ALIGN_ISO_ROW_LOOKUPS = None
 ALLVAL_PAIRWISE = None
-GENE_NAMES = None
+#GENE_NAMES = None
 
 
 def collate_pair(iso1, iso2):
     
-    global ISOLATE_GENE_INDICES, ALIGN_ISO_ROW_LOOKUPS, ALLVAL_PAIRWISE, GENE_NAMES
+    global ISOLATE_GENE_INDICES, ALIGN_ISO_ROW_LOOKUPS, ALLVAL_PAIRWISE
     
     shared_genes = list(ISOLATE_GENE_INDICES[iso1] & ISOLATE_GENE_INDICES[iso2])
     
@@ -47,7 +47,7 @@ def collate_pair(iso1, iso2):
     length_matrices = [ALLVAL_PAIRWISE[gene][1] for gene in shared_genes]
     
     # Retrieve gene names directly as a NumPy array
-    isolate_gene_names = GENE_NAMES[shared_genes]
+    isolate_gene_names = shared_genes
     
     # Use advanced indexing and avoid creating extra NumPy arrays
     gene_dists = np.array([dist_matrices[i][r1, r2] for i, r1, r2 in zip(range(len(shared_genes)), iso1_alnrows, iso2_alnrows)])
@@ -61,18 +61,17 @@ def collate_pair(iso1, iso2):
 
 def _init_worker(isolate_gene_indices,
                  alignment_isolate_row_lookup_dics,
-                 allval_pairwise,
-                 gene_names):
+                 allval_pairwise):
 
     global ISOLATE_GENE_INDICES
     global ALIGN_ISO_ROW_LOOKUPS
     global ALLVAL_PAIRWISE
-    global GENE_NAMES
+    #global GENE_NAMES
 
     ISOLATE_GENE_INDICES = isolate_gene_indices
     ALIGN_ISO_ROW_LOOKUPS = alignment_isolate_row_lookup_dics
     ALLVAL_PAIRWISE = allval_pairwise
-    GENE_NAMES = gene_names
+    #GENE_NAMES = gene_names
 
 
 def parallel_collate_pairs(
@@ -80,7 +79,6 @@ def parallel_collate_pairs(
     isolate_gene_indices,
     alignment_isolate_row_lookup_dics,
     allval_pairwise,
-    gene_names,
     n_cpu
 ):
     # Ensure fork mode (only works on POSIX systems)
@@ -97,7 +95,6 @@ def parallel_collate_pairs(
             isolate_gene_indices,
             alignment_isolate_row_lookup_dics,
             allval_pairwise,
-            gene_names
         )
     ) as executor:
 
@@ -148,7 +145,7 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads, gpu)
                                                           isolate_gene_indices, 
                                                           alignment_isolate_row_lookup_dics, 
                                                           allval_pairwise, 
-                                                          gene_names, threads)
+                                                          threads)
         
     #Single threaded code is faster, again
     # pair_diff_len_distributions = []
@@ -202,7 +199,7 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads, gpu)
     
     if len(pairids) != len(pair_diff_len_distributions):
         raise ValueError("Pairwise comparisons not equal to number of pairs!")
-    return pairids, pair_diff_len_distributions    
+    return pairids, pair_diff_len_distributions, gene_names 
 
 def parse_pangenome(output_dir, threads, use_gpu):
     if output_dir[-1] != "/":
