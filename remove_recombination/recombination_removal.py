@@ -98,16 +98,23 @@ def main():
     
     #multithreading
     print("Identifying recombinants...")
-    if args.method =="bayesian":
-         results = Parallel(n_jobs=args.n_cpu, 
-                                                              prefer="process")(
-            delayed(recombination_analysis_bayesian)(ordered_pairs[index]) for index in tqdm(range(len(ordered_pairs))))
-         pairwise_recombinant_genes, mean_distances = zip(*results)                                                         
-    elif args.method == "frequentist":
-        results = Parallel(n_jobs=args.n_cpu, 
-                                                              prefer="process")(
-            delayed(recombination_analysis_frequentist)(ordered_pairs[index]) for index in tqdm(range(len(ordered_pairs)))) 
-        pairwise_recombinant_genes, mean_distances = zip(*results)
+    
+    #
+    
+    #if args.method =="bayesian":
+         # results = Parallel(n_jobs=args.n_cpu, 
+         #                                                      prefer="process")(
+         #    delayed(recombination_analysis_bayesian)(ordered_pairs[index]) for index in tqdm(range(len(ordered_pairs))))
+         # pairwise_recombinant_genes, mean_distances = zip(*results)                                                         
+    #elif args.method == "frequentist":
+        # results = Parallel(n_jobs=args.n_cpu, 
+        #                                                       prefer="process")(
+        #     delayed(recombination_analysis_frequentist)(ordered_pairs[index]) for index in tqdm(range(len(ordered_pairs)))) 
+        # pairwise_recombinant_genes, mean_distances = zip(*results)
+        
+    results = do_recombination_analysis(ordered_pairs, args.method, args.n_cpu)    
+    pairwise_recombinant_genes, mean_distances = zip(*results) 
+    
     #Reformat pairwise results
     for index in range(len(ordered_pairs)):
         pair_recombinants = pairwise_recombinant_genes[index]

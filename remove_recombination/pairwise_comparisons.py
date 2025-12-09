@@ -4,6 +4,9 @@ import numpy as np
 
 from pairsnp import calculate_snp_matrix, calculate_distance_matrix
 
+import multiprocessing as mp
+from concurrent.futures import ProcessPoolExecutor
+
 #Legacy
 # def check_for_big_indel(byteseq1, byteseq2):
 #     gaps1 = np.sum(byteseq1 == 45) #45 == ord("-") 

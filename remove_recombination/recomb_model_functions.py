@@ -1,11 +1,17 @@
 import math
 
+import multiprocessing as mp
+from concurrent.futures import ProcessPoolExecutor
+
 from tqdm import tqdm
 import numpy as np
 
 import scipy.special as sp
 from scipy import stats
 from scipy import optimize
+
+
+
 
 #This module contains all the functions required to identify recombinant pairs.
 #genes, and estimate r/m for the collection
@@ -125,6 +131,31 @@ def estimate_collection_rm(cleaned_dists, uncleaned_dists):
                                             flat_uncleaned)
     
     return(regression[0], stderr[0], (flat_cleaned, flat_uncleaned))
+
+
+def do_recombination_analysis(pairs, framework, threads):
+    
+    # Ensure fork mode (only works on POSIX systems)
+    #mp.set_start_method("fork", force=True)
+    
+    if framework == "frequentist":
+        with ProcessPoolExecutor(
+            max_workers=threads
+            ) as executor:
+            results_iter = executor.map(recombination_analysis_frequentist, 
+                                        pairs)
+
+        return list(tqdm(results_iter, total=len(pairs)))
+    
+    elif framework == "bayesian":
+        with ProcessPoolExecutor(
+            max_workers=threads
+            ) as executor:
+
+            results_iter = executor.map(recombination_analysis_bayesian, 
+                                        pairs)
+
+        return list(tqdm(results_iter, total=len(pairs)))
 
 def recombination_analysis_bayesian(pair):
     #wrapper to help keep recombination_removal neat
