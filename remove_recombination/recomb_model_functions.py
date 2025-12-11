@@ -181,6 +181,7 @@ def do_recombination_analysis(pairs, framework, threads):
             results = []
             for future in tqdm(as_completed(futures), total=len(pairs)):
                 results.append(future.result())
+        return results
 
 def recombination_analysis_bayesian(pair):
     #wrapper to help keep recombination_removal neat
