@@ -1,7 +1,7 @@
 import math
 
 import multiprocessing as mp
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from tqdm import tqdm
 import numpy as np
@@ -138,24 +138,49 @@ def do_recombination_analysis(pairs, framework, threads):
     # Ensure fork mode (only works on POSIX systems)
     #mp.set_start_method("fork", force=True)
     
+    # if framework == "frequentist":
+    #     with ProcessPoolExecutor(
+    #         max_workers=threads
+    #         ) as executor:
+    #         results_iter = executor.map(recombination_analysis_frequentist, 
+    #                                     pairs)
+
+    #     return list(tqdm(results_iter, total=len(pairs)))
+    
+    # elif framework == "bayesian":
+    #     with ProcessPoolExecutor(
+    #         max_workers=threads
+    #         ) as executor:
+
+    #         results_iter = executor.map(recombination_analysis_bayesian, 
+    #                                     pairs)
+
+    #     return list(tqdm(results_iter, total=len(pairs)))
+    
     if framework == "frequentist":
         with ProcessPoolExecutor(
             max_workers=threads
             ) as executor:
-            results_iter = executor.map(recombination_analysis_frequentist, 
-                                        pairs)
+            futures = [executor.submit(recombination_analysis_frequentist,
+                                       pair) for pair in pairs]
 
-        return list(tqdm(results_iter, total=len(pairs)))
+            results = []
+            for future in tqdm(as_completed(futures), total=len(pairs)):
+                results.append(future.result())
+
+        return results
     
     elif framework == "bayesian":
         with ProcessPoolExecutor(
             max_workers=threads
             ) as executor:
 
-            results_iter = executor.map(recombination_analysis_bayesian, 
-                                        pairs)
+            futures = [executor.submit(recombination_analysis_bayesian,
+                                       pair) for pair in pairs]
 
-        return list(tqdm(results_iter, total=len(pairs)))
+            results = []
+            for future in tqdm(as_completed(futures), total=len(pairs)):
+                results.append(future.result())
 
 def recombination_analysis_bayesian(pair):
     #wrapper to help keep recombination_removal neat
