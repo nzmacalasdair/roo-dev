@@ -4,6 +4,8 @@ import decimal
 
 from joblib import Parallel, delayed
 
+from tqdm import tqdm
+
 import numpy as np
 from scipy import sparse
 from scipy import stats
@@ -122,7 +124,7 @@ def main():
         pair = pairs[index] #pair is first position in the tuple
         for gene in pair_recombinants:
             gene_name = gene_names[gene]
-            gene_recombination_dic[gene_name] = gene_recombination_dic.get(gene,
+            gene_recombination_dic[gene_name] = gene_recombination_dic.get(gene_name,
                                                                   []) + [pair]
 
         total_dists[pair] = pair_dists[0]
@@ -145,7 +147,8 @@ def main():
     if not os.path.isdir(args.outdir + "pairwise_recombination_networks/"):
         os.mkdir(args.outdir + "pairwise_recombination_networks/")
     actual_recombinants_to_remove = {}
-    for gene in gene_recombination_dic:
+    print("Integrating pairwise results...")
+    for gene in tqdm(gene_recombination_dic):
         if len(gene_recombination_dic[gene]) > 1:
             gene_network = nx.Graph()
             for recombinant_pair in gene_recombination_dic[gene]:
@@ -185,7 +188,7 @@ def main():
     core_names = [G.nodes[x]["name"] for x in core_nodes]
     concatenate_core_genome_alignments(core_names, args.outdir)
     
-    #Estimate the collection r/m by pooling rations and estimating the slope
+    #Estimate the collection r/m by pooling ratios and estimating the slope
     
     rm, stderr, dist_lists = estimate_collection_rm(cleaned_dists, total_dists)
     
