@@ -13,11 +13,13 @@ import networkx as nx
 from Bio import SeqIO
 
 from remove_recombination.read_panout import parse_pangenome 
-from remove_recombination.read_panout import remove_recombinant_seqs
-from remove_recombination.read_panout import write_rm_estimate
-from remove_recombination.read_panout import get_core_gene_nodes
-from remove_recombination.read_panout import concatenate_core_genome_alignments
-from remove_recombination.read_panout import write_alignment_header
+
+from remove_recombination.write_output import remove_recombinant_seqs
+from remove_recombination.write_output import write_rm_estimate
+from remove_recombination.write_output import get_core_gene_nodes
+from remove_recombination.write_output import concatenate_core_genome_alignments
+from remove_recombination.write_output import write_alignment_header
+
 
 from remove_recombination.recomb_model_functions import *
 
@@ -53,10 +55,10 @@ def main():
                         help="number of threads to use (default=1)",
                         type=int,
                         default=1)
-    parser.add_argument("--gpu",
+    parser.add_argument("--write_data",
                         action="store_true",
-                        help="""Use CuPy to speed up pairwise distance estimates. 
-                        Highly recomended on datasets of >=10^3 isolates""")
+                        help="""Output pairwise distributions and per-gene
+                        reconbimation networks used to identify recombinants""")
     args = parser.parse_args()
     
     #Make sure formatting is correct for panaroo dir, and create new out dir
@@ -69,7 +71,7 @@ def main():
         raise ValueError("Method must be one of [bayesian, frequentist]")
         
     #Load in relevant info from genes
-    pairs, pairwise_differences, gene_names = parse_pangenome(args.outdir, args.n_cpu, args.gpu)
+    pairs, pairwise_differences, gene_names = parse_pangenome(args.outdir, args.n_cpu)
     
     #Order genes from least snps/length to greatest snps/length
     ordered_pairs = order_pairwise_diffs(pairwise_differences)
@@ -98,7 +100,21 @@ def main():
     #     cleaned_dists[pair] = dists[1]
     #     pairwise_rm_estimates = dists[2]/dists[1]
     
-    #multithreading
+    #output debug files
+    if args.write_data:
+        with open(args.outdir + "pairwise_difference_distributions.csv", 
+                  'w+') as outhandle:
+            outhandle.write("pair,diffs,lens,gene_names")
+            for pairidx in range(len(pairs)):
+                outline = pairs[pairidx] +','
+                dists = ';'.join(ordered_pairs[pairidx][0][:,0].astype(str)) +','
+                lens = ";".join(ordered_pairs[pairidx][0][:,1].astype(str)) +','
+                genes = ';'.join(ordered_pairs[pairidx][1].astype(str))
+                outline += dists
+                outline += lens
+                outline += genes
+                outhandle.write(outline + '\n')
+                
     print("Identifying recombinants...")
     
     #
@@ -118,7 +134,8 @@ def main():
     pairwise_recombinant_genes, mean_distances = zip(*results) 
     
     #Reformat pairwise results
-    for index in range(len(ordered_pairs)):
+    no_of_pairs = len(ordered_pairs)
+    for index in range(no_of_pairs):
         pair_recombinants = pairwise_recombinant_genes[index]
         pair_dists = mean_distances[index]
         pair = pairs[index] #pair is first position in the tuple
@@ -144,8 +161,9 @@ def main():
 
     #Reduce recombinant pairs to only isolates where recombination is present
     #Do this by making a network and taking only isolates of degree > 2
-    if not os.path.isdir(args.outdir + "pairwise_recombination_networks/"):
-        os.mkdir(args.outdir + "pairwise_recombination_networks/")
+    if args.write_data:
+        if not os.path.isdir(args.outdir + "pairwise_recombination_networks/"):
+            os.mkdir(args.outdir + "pairwise_recombination_networks/")
     actual_recombinants_to_remove = {}
     print("Integrating pairwise results...")
     for gene in tqdm(gene_recombination_dic):
@@ -154,7 +172,8 @@ def main():
             for recombinant_pair in gene_recombination_dic[gene]:
                 recombination_list = recombinant_pair.split("-")
                 gene_network.add_edge(*recombination_list)
-            nx.write_gml(gene_network, 
+            if args.write_data:
+                nx.write_gml(gene_network, 
                          args.outdir + "pairwise_recombination_networks/" + gene + ".gml")
             if len(gene_network.nodes) >= 4:
                 to_remove = []

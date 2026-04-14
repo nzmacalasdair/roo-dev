@@ -13,7 +13,7 @@ from scipy import optimize
 
 
 
-#This module contains all the functions required to identify recombinant pairs.
+#This module contains Fthe functions required to identify recombinant pairs.
 #genes, and estimate r/m for the collection
 
 def order_pairwise_diffs(pairwise_matrices):
@@ -26,7 +26,6 @@ def order_pairwise_diffs(pairwise_matrices):
         length = pair[2]             # 1D array
 
         # Compute proportion using a reusable array to avoid creating temporaries
-        # If division by zero is possible, you can add a mask instead.
         proportion = dist / length
 
         # argsort once
@@ -114,6 +113,10 @@ def analyse_pair_frequentist(ordered_diffs, ordered_lengths, ordered_genes):
             break
         else:
             continue
+    #Handle case where no genes are recombinant
+    if threshold == 0:
+        threshold = len(ordered_diffs)
+    
     recombinant_genes = ordered_genes[threshold:]
     
     return (threshold, recombinant_genes)
