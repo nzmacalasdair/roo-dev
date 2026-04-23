@@ -1,16 +1,9 @@
 import os
-import math
-import decimal
-
-from joblib import Parallel, delayed
 
 from tqdm import tqdm
 
 import numpy as np
-from scipy import sparse
-from scipy import stats
 import networkx as nx
-from Bio import SeqIO
 
 from remove_recombination.read_panout import parse_pangenome 
 
@@ -18,11 +11,8 @@ from remove_recombination.write_output import remove_recombinant_seqs
 from remove_recombination.write_output import write_rm_estimate
 from remove_recombination.write_output import get_core_gene_nodes
 from remove_recombination.write_output import concatenate_core_genome_alignments
-from remove_recombination.write_output import write_alignment_header
-
-
 from remove_recombination.recomb_model_functions import *
-
+from remove_recombination.recombination_networks import *
 
 def main():
     import argparse
@@ -63,22 +53,29 @@ def main():
     
     #Make sure formatting is correct for panaroo dir, and create new out dir
     args.outdir = os.path.join(args.outdir, "")
-    if not os.path.isdir(args.outdir + "recombination_free_aligned_genes/"):
-        os.mkdir(args.outdir + "recombination_free_aligned_genes/")
+    output_alignment_dir = os.path.join(args.outdir, "recombination_free_aligned_genes")
+    if not os.path.isdir(output_alignment_dir):
+        os.mkdir(output_alignment_dir)
 
     #Check to make sure args.method is accurate
     if args.method not in ["bayesian", "frequentist"]:
         raise ValueError("Method must be one of [bayesian, frequentist]")
+    if not 0 < args.core <= 1:
+        raise ValueError("Core threshold must be in the range (0, 1].")
         
     #Load in relevant info from genes
-    pairs, pairwise_differences, gene_names = parse_pangenome(args.outdir, args.n_cpu)
+    pairs, pairwise_differences, gene_names, alignment_dir = parse_pangenome(
+        args.outdir,
+        args.n_cpu,
+    )
     
     #Order genes from least snps/length to greatest snps/length
     ordered_pairs = order_pairwise_diffs(pairwise_differences)
+    if len(ordered_pairs) != len(pairs):
+        raise ValueError("Pairwise analysis inputs do not match the pair list.")
     
     #Set up some empty dics for results
     gene_recombination_dic = {}
-    pairwise_rm_estimates = {}
     cleaned_dists = {}
     total_dists = {}
 
@@ -104,12 +101,13 @@ def main():
     if args.write_data:
         with open(args.outdir + "pairwise_difference_distributions.csv", 
                   'w+') as outhandle:
-            outhandle.write("pair,diffs,lens,gene_names")
+            outhandle.write("pair,diffs,lens,gene_names\n")
             for pairidx in range(len(pairs)):
                 outline = pairs[pairidx] +','
                 dists = ';'.join(ordered_pairs[pairidx][0][:,0].astype(str)) +','
                 lens = ";".join(ordered_pairs[pairidx][0][:,1].astype(str)) +','
-                genes = ';'.join(ordered_pairs[pairidx][1].astype(str))
+                geneids = ordered_pairs[pairidx][1].astype(str)
+                genes = ';'.join(gene_names[int(x)] for x in geneids)
                 outline += dists
                 outline += lens
                 outline += genes
@@ -130,7 +128,9 @@ def main():
         #     delayed(recombination_analysis_frequentist)(ordered_pairs[index]) for index in tqdm(range(len(ordered_pairs)))) 
         # pairwise_recombinant_genes, mean_distances = zip(*results)
         
-    results = do_recombination_analysis(ordered_pairs, args.method, args.n_cpu)    
+    results = do_recombination_analysis(ordered_pairs, args.method, args.n_cpu)
+    if len(results) != len(pairs):
+        raise ValueError("Pairwise analysis results do not match the pair list.")
     pairwise_recombinant_genes, mean_distances = zip(*results) 
     
     #Reformat pairwise results
@@ -146,18 +146,9 @@ def main():
 
         total_dists[pair] = pair_dists[0]
         cleaned_dists[pair] = pair_dists[1]
-        pairwise_rm_estimates = pair_dists[2]/pair_dists[1]
     
-    if gene_recombination_dic == {}:
-        print("ERROR: Gene recombination dictionary is empty")
-        print("Latest pair_recombinants:")
-        print(pair_recombinants)
-        print("All pairwise recombinants:")
-        print(pairwise_recombinant_genes)
-        print("results")
-        print(results)
-        print("Ordered pairs[0]:")
-        print(ordered_pairs[0])
+    if not gene_recombination_dic:
+        print("No recombinant genes identified.")
 
     #Reduce recombinant pairs to only isolates where recombination is present
     #Do this by making a network and taking only isolates of degree > 2
@@ -168,27 +159,15 @@ def main():
     print("Integrating pairwise results...")
     for gene in tqdm(gene_recombination_dic):
         if len(gene_recombination_dic[gene]) > 1:
-            gene_network = nx.Graph()
-            for recombinant_pair in gene_recombination_dic[gene]:
-                recombination_list = recombinant_pair.split("-")
-                gene_network.add_edge(*recombination_list)
+            gene_network = build_recombination_network(gene_recombination_dic[gene])
             if args.write_data:
                 nx.write_gml(gene_network, 
                          args.outdir + "pairwise_recombination_networks/" + gene + ".gml")
-            if len(gene_network.nodes) >= 4:
-                to_remove = []
-                min_degree = min([x[1] for x in gene_network.degree])
-                if min_degree == max([x[1] for x in gene_network.degree]):
-                    to_remove = list(gene_network.nodes)
-                else:
-                    for gene_degree in gene_network.degree:
-                        if gene_degree[1] > min_degree:
-                            to_remove.append(gene_degree[0])
-            else:
-                to_remove = list(gene_network.nodes)
+            to_remove = identify_genuine_recombinants(gene_network)
+            actual_recombinants_to_remove[gene] = to_remove
         else:
-            to_remove = gene_recombination_dic[gene][0].split("-")
-        actual_recombinants_to_remove[gene] = to_remove
+            #Skip genes where there is only one pair of isolates
+            continue
     #Output list of recombinant gene sequence names
     with open(args.outdir + "recombinant_gene_ids.csv", 'w+') as outhandle:
        outhandle.write("Gene,Recombinant_Isolates\n")
@@ -197,13 +176,18 @@ def main():
            outhandle.write(outline + '\n')
     
     #Remove recombinant sequences and write new alignments to file
-    remove_recombinant_seqs(actual_recombinants_to_remove, args.outdir)
+    remove_recombinant_seqs(
+        actual_recombinants_to_remove,
+        args.outdir,
+        alignment_dir,
+        gene_names,
+    )
     #Write new core genome alignment
     G = nx.read_gml(args.outdir + "final_graph.gml")
     with open(args.outdir + "gene_presence_absence.Rtab", 'r') as inhandle:
         header = inhandle.readline()
     isolate_no = len(header.split()) - 1
-    core_nodes = get_core_gene_nodes(G, isolate_no, args.core)
+    core_nodes = get_core_gene_nodes(G, args.core, isolate_no)
     core_names = [G.nodes[x]["name"] for x in core_nodes]
     concatenate_core_genome_alignments(core_names, args.outdir)
     

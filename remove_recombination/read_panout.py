@@ -244,6 +244,11 @@ def parse_pangenome(output_dir, threads):
                 genes.remove(name)
     #Get all the distributions of pairwise differences
     
-    pairs, pairwise_differences, gene_names, = get_all_pairwise_diffs(pairs, genes, gene_alignments_dir, threads)
+    pairs, pairwise_differences, gene_names, = get_all_pairwise_diffs(
+        pairs,
+        genes,
+        gene_alignments_dir,
+        threads,
+    )
 
-    return pairs, pairwise_differences, gene_names
+    return pairs, pairwise_differences, gene_names, gene_alignments_dir
