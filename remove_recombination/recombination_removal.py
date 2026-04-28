@@ -1,4 +1,5 @@
 import os
+from collections import defaultdict
 
 from tqdm import tqdm
 
@@ -75,9 +76,9 @@ def main():
         raise ValueError("Pairwise analysis inputs do not match the pair list.")
     
     #Set up some empty dics for results
-    gene_recombination_dic = {}
-    cleaned_dists = {}
+    gene_recombination_dic = defaultdict(list)
     total_dists = {}
+    pair_gene_dist_lookup = {}
 
     #Do analysis, either bayesian or frequentist to identify recomb. gene pairs
     ##single-threaded code, for now    
@@ -139,13 +140,18 @@ def main():
         pair_recombinants = pairwise_recombinant_genes[index]
         pair_dists = mean_distances[index]
         pair = pairs[index] #pair is first position in the tuple
+        pair_gene_dist_lookup[pair] = {
+            gene_names[int(gene_idx)]: int(gene_dist)
+            for gene_idx, gene_dist in zip(
+                ordered_pairs[index][1],
+                ordered_pairs[index][0][:, 0],
+            )
+        }
         for gene in pair_recombinants:
             gene_name = gene_names[gene]
-            gene_recombination_dic[gene_name] = gene_recombination_dic.get(gene_name,
-                                                                  []) + [pair]
+            gene_recombination_dic[gene_name].append(pair)
 
         total_dists[pair] = pair_dists[0]
-        cleaned_dists[pair] = pair_dists[1]
     
     if not gene_recombination_dic:
         print("No recombinant genes identified.")
@@ -174,6 +180,38 @@ def main():
        for gene in actual_recombinants_to_remove:
            outline = gene +','+ ";".join(actual_recombinants_to_remove[gene])
            outhandle.write(outline + '\n')
+
+    cleaned_dists, recombinant_dists, retained_pairs_by_gene = reconcile_cleaned_distances(
+        total_dists,
+        pair_gene_dist_lookup,
+        gene_recombination_dic,
+        actual_recombinants_to_remove,
+    )
+
+    if args.write_data:
+        with open(args.outdir + "retained_recombinant_pairs.csv", "w+") as outhandle:
+            outhandle.write("Gene,Recombinant_Isolates,Retained_Pairs\n")
+            for gene in actual_recombinants_to_remove:
+                retained_pairs = retained_pairs_by_gene.get(gene, [])
+                outline = (
+                    gene
+                    + ","
+                    + ";".join(actual_recombinants_to_remove[gene])
+                    + ","
+                    + ";".join(retained_pairs)
+                )
+                outhandle.write(outline + "\n")
+
+        with open(args.outdir + "pairwise_rm_components.csv", "w+") as outhandle:
+            outhandle.write("Pair,Total_SNPs,Recombinant_SNPs,Cleaned_SNPs,Pairwise_r_m\n")
+            for pair in pairs:
+                cleaned = cleaned_dists[pair]
+                recombinant = recombinant_dists[pair]
+                pairwise_rm = recombinant / cleaned if cleaned > 0 else ""
+                outline = (
+                    f"{pair},{total_dists[pair]},{recombinant},{cleaned},{pairwise_rm}"
+                )
+                outhandle.write(outline + "\n")
     
     #Remove recombinant sequences and write new alignments to file
     remove_recombinant_seqs(
@@ -191,9 +229,8 @@ def main():
     core_names = [G.nodes[x]["name"] for x in core_nodes]
     concatenate_core_genome_alignments(core_names, args.outdir)
     
-    #Estimate the collection r/m by pooling ratios and estimating the slope
-    
-    rm, stderr, dist_lists = estimate_collection_rm(cleaned_dists, total_dists)
+    #Estimate the collection r/m from retained recombinant and non-recombinant SNPs
+    rm, stderr, dist_lists = estimate_collection_rm(cleaned_dists, recombinant_dists)
     
     print("Estimated r/m for collection: %s" %rm)
     
@@ -204,9 +241,9 @@ def main():
         import matplotlib.pyplot as plt
         
         plt.scatter(dist_lists[0], dist_lists[1])
-        plt.plot(np.arange(max(dist_lists[0])), 
-                 rm*np.arange(max(dist_lists[0])), 
-                 'r', label='fitted line')
+        plt.plot(np.arange(max(dist_lists[0]) + 1),
+                 rm*np.arange(max(dist_lists[0]) + 1),
+                 'r', label='r/m')
         plt.savefig(args.outdir + "collection_rm_estimate_regression.png")
 
 
