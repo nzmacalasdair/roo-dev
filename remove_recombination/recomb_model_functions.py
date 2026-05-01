@@ -121,8 +121,8 @@ def analyse_pair_frequentist(ordered_diffs, ordered_lengths, ordered_genes):
     return (threshold, recombinant_genes)
     
 
-def pair_has_retained_recombinant(pair, retained_isolates):
-    iso1, iso2 = pair.split("-", 1)
+def pair_has_retained_recombinant(pair_idx, pair_index_to_isolates, retained_isolates):
+    iso1, iso2 = pair_index_to_isolates[pair_idx]
     retained = set(retained_isolates)
     return (iso1 in retained) or (iso2 in retained)
 
@@ -130,9 +130,10 @@ def pair_has_retained_recombinant(pair, retained_isolates):
 def reconcile_cleaned_distances(total_dists,
                                 recombinant_gene_pair_dist,
                                 gene_recombination_dic,
-                                actual_recombinants_to_remove):
-    cleaned_dists = total_dists.copy()
-    recombinant_dists = {pair: 0 for pair in total_dists}
+                                actual_recombinants_to_remove,
+                                pair_index_to_isolates):
+    cleaned_dists = list(total_dists)
+    recombinant_dists = [0] * len(total_dists)
     retained_pairs_by_gene = {}
 
     for gene, retained_isolates in actual_recombinants_to_remove.items():
@@ -140,29 +141,35 @@ def reconcile_cleaned_distances(total_dists,
             continue
 
         retained_pairs = []
-        for pair in dict.fromkeys(gene_recombination_dic.get(gene, [])):
-            if not pair_has_retained_recombinant(pair, retained_isolates):
+        for pair_idx in dict.fromkeys(gene_recombination_dic.get(gene, [])):
+            if not pair_has_retained_recombinant(
+                pair_idx,
+                pair_index_to_isolates,
+                retained_isolates,
+            ):
                 continue
 
-            gene_dist = recombinant_gene_pair_dist.get(gene, {}).get(pair)
+            gene_dist = recombinant_gene_pair_dist.get(gene, {}).get(pair_idx)
             if gene_dist is None:
                 raise ValueError(
-                    f"Missing pairwise SNP distance for gene '{gene}' in pair '{pair}'."
+                    f"Missing pairwise SNP distance for gene '{gene}' in pair index '{pair_idx}'."
                 )
 
-            cleaned_dists[pair] -= gene_dist
-            recombinant_dists[pair] += gene_dist
-            retained_pairs.append(pair)
+            cleaned_dists[pair_idx] -= gene_dist
+            recombinant_dists[pair_idx] += gene_dist
+            retained_pairs.append(pair_idx)
 
         if retained_pairs:
             retained_pairs_by_gene[gene] = retained_pairs
 
-    for pair, total_dist in total_dists.items():
-        if cleaned_dists[pair] < 0:
-            raise ValueError(f"Cleaned distance for pair '{pair}' became negative.")
-        if cleaned_dists[pair] > total_dist:
+    for pair_idx, total_dist in enumerate(total_dists):
+        if cleaned_dists[pair_idx] < 0:
             raise ValueError(
-                f"Cleaned distance for pair '{pair}' exceeds total distance."
+                f"Cleaned distance for pair index '{pair_idx}' became negative."
+            )
+        if cleaned_dists[pair_idx] > total_dist:
+            raise ValueError(
+                f"Cleaned distance for pair index '{pair_idx}' exceeds total distance."
             )
 
     return cleaned_dists, recombinant_dists, retained_pairs_by_gene
@@ -173,11 +180,11 @@ def estimate_collection_rm(cleaned_dists, recombinant_dists):
     flat_recombinant = []
     pairwise_rms = []
     
-    for x in cleaned_dists:
-        flat_cleaned.append(cleaned_dists[x])
-        flat_recombinant.append(recombinant_dists[x])
-        if cleaned_dists[x] > 0:
-            pairwise_rms.append(recombinant_dists[x] / cleaned_dists[x])
+    for cleaned, recombinant in zip(cleaned_dists, recombinant_dists):
+        flat_cleaned.append(cleaned)
+        flat_recombinant.append(recombinant)
+        if cleaned > 0:
+            pairwise_rms.append(recombinant / cleaned)
 
     total_cleaned = sum(flat_cleaned)
     total_recombinant = sum(flat_recombinant)

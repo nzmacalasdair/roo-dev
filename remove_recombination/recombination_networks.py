@@ -1,10 +1,9 @@
 import networkx as nx
 
-def build_recombination_network(gene_recombination_dic):
+def build_recombination_network(recombinant_pairs, pair_index_to_isolates):
     gene_network = nx.Graph()
-    for recombinant_pair in gene_recombination_dic:
-        recombination_list = recombinant_pair.split("-")
-        gene_network.add_edge(*recombination_list)
+    for pair_idx in recombinant_pairs:
+        gene_network.add_edge(*pair_index_to_isolates[pair_idx])
     return gene_network
 
 def identify_genuine_recombinants(G):

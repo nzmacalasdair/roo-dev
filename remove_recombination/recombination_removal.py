@@ -74,10 +74,11 @@ def main():
     ordered_pairs = order_pairwise_diffs(pairwise_differences)
     if len(ordered_pairs) != len(pairs):
         raise ValueError("Pairwise analysis inputs do not match the pair list.")
+    pair_index_to_isolates = [pair.split("-", 1) for pair in pairs]
     
     #Set up some empty dics for results
     gene_recombination_dic = defaultdict(list)
-    total_dists = {}
+    total_dists = [0] * len(pairs)
     recombinant_gene_pair_dist = defaultdict(dict)
 
     #Do analysis, either bayesian or frequentist to identify recomb. gene pairs
@@ -136,22 +137,21 @@ def main():
     
     #Reformat pairwise results
     no_of_pairs = len(ordered_pairs)
-    for index in range(no_of_pairs):
-        pair_recombinants = pairwise_recombinant_genes[index]
-        pair_dists = mean_distances[index]
-        pair = pairs[index] #pair is first position in the tuple
+    for pair_idx in range(no_of_pairs):
+        pair_recombinants = pairwise_recombinant_genes[pair_idx]
+        pair_dists = mean_distances[pair_idx]
         gene_idx_to_dist = dict(
             zip(
-                ordered_pairs[index][1],
-                ordered_pairs[index][0][:, 0],
+                ordered_pairs[pair_idx][1],
+                ordered_pairs[pair_idx][0][:, 0],
             )
         )
         for gene in pair_recombinants:
             gene_name = gene_names[gene]
-            gene_recombination_dic[gene_name].append(pair)
-            recombinant_gene_pair_dist[gene_name][pair] = int(gene_idx_to_dist[gene])
+            gene_recombination_dic[gene_name].append(pair_idx)
+            recombinant_gene_pair_dist[gene_name][pair_idx] = int(gene_idx_to_dist[gene])
 
-        total_dists[pair] = pair_dists[0]
+        total_dists[pair_idx] = pair_dists[0]
     
     if not gene_recombination_dic:
         print("No recombinant genes identified.")
@@ -165,7 +165,10 @@ def main():
     print("Integrating pairwise results...")
     for gene in tqdm(gene_recombination_dic):
         if len(gene_recombination_dic[gene]) > 1:
-            gene_network = build_recombination_network(gene_recombination_dic[gene])
+            gene_network = build_recombination_network(
+                gene_recombination_dic[gene],
+                pair_index_to_isolates,
+            )
             if args.write_data:
                 nx.write_gml(gene_network, 
                          args.outdir + "pairwise_recombination_networks/" + gene + ".gml")
@@ -186,13 +189,16 @@ def main():
         recombinant_gene_pair_dist,
         gene_recombination_dic,
         actual_recombinants_to_remove,
+        pair_index_to_isolates,
     )
 
     if args.write_data:
         with open(args.outdir + "retained_recombinant_pairs.csv", "w+") as outhandle:
             outhandle.write("Gene,Recombinant_Isolates,Retained_Pairs\n")
             for gene in actual_recombinants_to_remove:
-                retained_pairs = retained_pairs_by_gene.get(gene, [])
+                retained_pairs = [
+                    pairs[pair_idx] for pair_idx in retained_pairs_by_gene.get(gene, [])
+                ]
                 outline = (
                     gene
                     + ","
@@ -204,12 +210,12 @@ def main():
 
         with open(args.outdir + "pairwise_rm_components.csv", "w+") as outhandle:
             outhandle.write("Pair,Total_SNPs,Recombinant_SNPs,Cleaned_SNPs,Pairwise_r_m\n")
-            for pair in pairs:
-                cleaned = cleaned_dists[pair]
-                recombinant = recombinant_dists[pair]
+            for pair_idx, pair in enumerate(pairs):
+                cleaned = cleaned_dists[pair_idx]
+                recombinant = recombinant_dists[pair_idx]
                 pairwise_rm = recombinant / cleaned if cleaned > 0 else ""
                 outline = (
-                    f"{pair},{total_dists[pair]},{recombinant},{cleaned},{pairwise_rm}"
+                    f"{pair},{total_dists[pair_idx]},{recombinant},{cleaned},{pairwise_rm}"
                 )
                 outhandle.write(outline + "\n")
     
