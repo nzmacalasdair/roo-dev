@@ -6,7 +6,10 @@ from Bio.SeqRecord import SeqRecord
 
 #This module contains all functions necessary to write output
 def write_rm_estimate(rm_regression, output_dir):
-    outline1 = "Collection r/m estimate: " + str(rm_regression[0])
+    outline1 = (
+        "Collection r/m estimate (recombinant SNPs / non-recombinant SNPs): "
+        + str(rm_regression[0])
+    )
     outline2 = "Standard Error of Estimate: " + str(rm_regression[1])
     with open(output_dir + "rm_estimate.txt", 'w+') as outhandle:
         outhandle.write(outline1 + '\n')

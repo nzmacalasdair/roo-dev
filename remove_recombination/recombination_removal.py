@@ -78,7 +78,7 @@ def main():
     #Set up some empty dics for results
     gene_recombination_dic = defaultdict(list)
     total_dists = {}
-    pair_gene_dist_lookup = {}
+    recombinant_gene_pair_dist = defaultdict(dict)
 
     #Do analysis, either bayesian or frequentist to identify recomb. gene pairs
     ##single-threaded code, for now    
@@ -140,16 +140,16 @@ def main():
         pair_recombinants = pairwise_recombinant_genes[index]
         pair_dists = mean_distances[index]
         pair = pairs[index] #pair is first position in the tuple
-        pair_gene_dist_lookup[pair] = {
-            gene_names[int(gene_idx)]: int(gene_dist)
-            for gene_idx, gene_dist in zip(
+        gene_idx_to_dist = dict(
+            zip(
                 ordered_pairs[index][1],
                 ordered_pairs[index][0][:, 0],
             )
-        }
+        )
         for gene in pair_recombinants:
             gene_name = gene_names[gene]
             gene_recombination_dic[gene_name].append(pair)
+            recombinant_gene_pair_dist[gene_name][pair] = int(gene_idx_to_dist[gene])
 
         total_dists[pair] = pair_dists[0]
     
@@ -183,7 +183,7 @@ def main():
 
     cleaned_dists, recombinant_dists, retained_pairs_by_gene = reconcile_cleaned_distances(
         total_dists,
-        pair_gene_dist_lookup,
+        recombinant_gene_pair_dist,
         gene_recombination_dic,
         actual_recombinants_to_remove,
     )
