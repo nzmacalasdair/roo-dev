@@ -94,10 +94,10 @@ def concatenate_core_genome_alignments(core_names, output_dir):
 
     alignments_dir = output_dir + "/recombination_free_aligned_genes/"
     # Open up each alignment that is associated with a core node
-    alignment_filenames = os.listdir(alignments_dir)
-    core_filenames = [
+    alignment_filenames = sorted(os.listdir(alignments_dir))
+    core_filenames = sorted([
         x for x in alignment_filenames if x.split('.')[0] in core_names
-    ]
+    ])
     
     #Read in all these alignments
     gene_alignments = []
@@ -124,7 +124,7 @@ def concatenate_core_genome_alignments(core_names, output_dir):
         gene_alignments.append((gene_name, gene_dict, gene_length))
     # Combine them
     isolate_aln = []
-    for iso in isolates:
+    for iso in sorted(isolates):
         seq = ""
         for gene in gene_alignments:
             if iso in gene[1]:

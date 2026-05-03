@@ -27,8 +27,8 @@ def order_pairwise_diffs(pairwise_matrices):
         # Compute proportion using a reusable array to avoid creating temporaries
         proportion = dist / length
 
-        # argsort once
-        order = np.argsort(proportion)
+        # Break ties by longer alignments, then deterministically by gene id.
+        order = np.lexsort((genes, -length, proportion))
 
         # Reindex *without allocating multiple subarrays*
         # Use np.empty and fill in-place to reduce peak memory
@@ -42,6 +42,23 @@ def order_pairwise_diffs(pairwise_matrices):
         all_ordered_diffs.append((ordered, ordered_genes))
 
     return all_ordered_diffs
+
+
+def order_pairwise_diffs_chunk(collated_chunk):
+    ordered_chunk = []
+
+    for genes, dist, length in collated_chunk:
+        proportion = dist / length
+        order = np.lexsort((genes, -length, proportion))
+
+        ordered = np.empty((len(dist), 2), dtype=dist.dtype)
+        ordered[:, 0] = dist[order]
+        ordered[:, 1] = length[order]
+
+        ordered_genes = genes[order]
+        ordered_chunk.append((ordered, ordered_genes))
+
+    return ordered_chunk
 
 def calc_log_likelihood(lengths, diffs, hyp_par_1, hyp_par_2):
     log_likelihoods = []
@@ -211,6 +228,17 @@ def do_recombination_analysis(pairs, framework, threads):
     with ProcessPoolExecutor(max_workers=threads) as executor:
         results_iter = executor.map(analysis_fn, pairs)
         return list(tqdm(results_iter, total=len(pairs)))
+
+
+def analyse_pair_chunk(ordered_chunk, framework):
+    if framework == "frequentist":
+        analysis_fn = recombination_analysis_frequentist
+    elif framework == "bayesian":
+        analysis_fn = recombination_analysis_bayesian
+    else:
+        raise ValueError("Framework must be one of ['frequentist', 'bayesian']")
+
+    return [analysis_fn(pair) for pair in ordered_chunk]
 
 def recombination_analysis_bayesian(pair):
     #wrapper to help keep recombination_removal neat

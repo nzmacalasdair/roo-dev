@@ -35,7 +35,7 @@ def collate_pair(iso1, iso2):
     
     global ISOLATE_GENE_INDICES, ALIGN_ISO_ROW_LOOKUPS, ALLVAL_PAIRWISE
     
-    shared_genes = list(ISOLATE_GENE_INDICES[iso1] & ISOLATE_GENE_INDICES[iso2])
+    shared_genes = sorted(ISOLATE_GENE_INDICES[iso1] & ISOLATE_GENE_INDICES[iso2])
     
     # Precompute the row indices for iso1 and iso2 in a single pass
     iso1_alnrows = np.array([ALIGN_ISO_ROW_LOOKUPS[gene][iso1] for gene in shared_genes])
@@ -56,6 +56,31 @@ def collate_pair(iso1, iso2):
     )
     
     return (isolate_gene_names, gene_dists, gene_lens)
+
+
+def _build_pairwise_preload(filtered_alignment_paths, threads):
+    print("Calculating all pairwise differences...")
+    allval_pairwise = Parallel(n_jobs=threads, prefer="processes")(
+         delayed(get_pangenome_pairwise_differences)(alignment)
+         for alignment in tqdm(filtered_alignment_paths))
+
+    isolate_gene_indices = {}
+    alignment_isolate_row_lookup_dics = []
+    for gene_idx in range(len(allval_pairwise)):
+        seqids = allval_pairwise[gene_idx][2]
+        isolate_ids = [x.split(";")[0] for x in seqids]
+        for isolate in isolate_ids:
+            isolate_gene_indices[isolate] = isolate_gene_indices.get(isolate, set()) | {
+                gene_idx
+            }
+        row_lookup_dic = {value: index for index, value in enumerate(isolate_ids)}
+        alignment_isolate_row_lookup_dics.append(row_lookup_dic)
+
+    return {
+        "allval_pairwise": allval_pairwise,
+        "isolate_gene_indices": isolate_gene_indices,
+        "alignment_isolate_row_lookup_dics": alignment_isolate_row_lookup_dics,
+    }
 
 
 def _init_worker(isolate_gene_indices,
@@ -104,7 +129,7 @@ def parallel_collate_pairs(
 
 def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads):
     pair_diff_len_distributions = {}
-    alignment_names = os.listdir(alignment_directory)
+    alignment_names = sorted(os.listdir(alignment_directory))
     print("Reading alignments...")
     filtered_alignment_names = []
     for file in alignment_names:
@@ -115,25 +140,10 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads):
     
     filtered_alignment_paths = [alignment_directory + x for x in filtered_alignment_names]
 
-    print("Calculating all pairwise differences...")
-    allval_pairwise = Parallel(n_jobs=threads, prefer="processes")(
-         delayed(get_pangenome_pairwise_differences)(alignment)
-         for alignment in tqdm(filtered_alignment_paths))
-    
-    #reformat this data to the expected output format
-    #first get dics for fast lookup
-    isolate_gene_indices = {}
-    alignment_isolate_row_lookup_dics = []
-    for gene_idx in range(len(allval_pairwise)):
-        #paiwirse_diffs = allval_pairwise[gene_idx][0]
-        #comparison_lens = allval_pairwise[gene_idx][1]
-        seqids = allval_pairwise[gene_idx][2]
-        isolate_ids = [x.split(";")[0] for x in seqids]
-        for isolate in isolate_ids:
-            isolate_gene_indices[isolate] = isolate_gene_indices.get(isolate, 
-                                                        set()) | {gene_idx}
-        row_lookup_dic = {value: index for index, value in enumerate(isolate_ids)}
-        alignment_isolate_row_lookup_dics.append(row_lookup_dic)
+    preload = _build_pairwise_preload(filtered_alignment_paths, threads)
+    allval_pairwise = preload["allval_pairwise"]
+    isolate_gene_indices = preload["isolate_gene_indices"]
+    alignment_isolate_row_lookup_dics = preload["alignment_isolate_row_lookup_dics"]
     
     #Go through all pairs and get distances/lengths
     print("Collating genes for each isolate pair...")
@@ -199,6 +209,105 @@ def get_all_pairwise_diffs(pairs, filt_genes, alignment_directory, threads):
     if len(pairids) != len(pair_diff_len_distributions):
         raise ValueError("Pairwise comparisons not equal to number of pairs!")
     return pairids, pair_diff_len_distributions, gene_names 
+
+
+def collate_pair_chunk(chunk_pairs, preload):
+    allval_pairwise = preload["allval_pairwise"]
+    isolate_gene_indices = preload["isolate_gene_indices"]
+    alignment_isolate_row_lookup_dics = preload["alignment_isolate_row_lookup_dics"]
+
+    collated_chunk = []
+    for iso1, iso2 in chunk_pairs:
+        shared_genes = np.array(
+            sorted(isolate_gene_indices[iso1] & isolate_gene_indices[iso2]),
+            dtype=int,
+        )
+
+        iso1_alnrows = np.array(
+            [alignment_isolate_row_lookup_dics[gene][iso1] for gene in shared_genes]
+        )
+        iso2_alnrows = np.array(
+            [alignment_isolate_row_lookup_dics[gene][iso2] for gene in shared_genes]
+        )
+
+        dist_matrices = [allval_pairwise[gene][0] for gene in shared_genes]
+        length_matrices = [allval_pairwise[gene][1] for gene in shared_genes]
+
+        gene_dists = np.array(
+            [
+                dist_matrices[i][r1, r2]
+                for i, r1, r2 in zip(range(len(shared_genes)), iso1_alnrows, iso2_alnrows)
+            ]
+        )
+        gene_lens = np.minimum(
+            np.array(
+                [
+                    length_matrices[i][r1]
+                    for i, r1 in zip(range(len(shared_genes)), iso1_alnrows)
+                ]
+            ),
+            np.array(
+                [
+                    length_matrices[i][r2]
+                    for i, r2 in zip(range(len(shared_genes)), iso2_alnrows)
+                ]
+            ),
+        )
+
+        collated_chunk.append((shared_genes, gene_dists, gene_lens))
+
+    return collated_chunk
+
+
+def parse_pangenome_preload(output_dir, threads):
+    if output_dir[-1] != "/":
+        output_dir += "/"
+    gene_pa_file = output_dir + "gene_presence_absence.csv"
+    if not os.path.isfile(gene_pa_file):
+        raise ValueError("Panaroo output is missing, is the output directory correct?")
+    with open(gene_pa_file) as inhandle:
+        firstline = inhandle.readline()
+    isolates = firstline.split(",")[3:]
+    isolates = [x.strip() for x in isolates]
+    pairs = get_pairs(isolates)
+
+    gene_alignments_dir = output_dir + "codon_aligned_gene_sequences/"
+    if not os.path.isdir(gene_alignments_dir):
+        gene_alignments_dir = output_dir + "aligned_gene_sequences/"
+    if not os.path.isdir(gene_alignments_dir):
+        raise ValueError("aligned_gene_sequences directory is missing!")
+
+    gene_alignment_files = sorted(os.listdir(gene_alignments_dir))
+    gene_alignment_files = [x for x in gene_alignment_files if ".aln.fas" in x]
+    genes = [x.split(".")[0] for x in gene_alignment_files]
+
+    with open(output_dir + "alignment_entropy.csv", 'r') as inhandle:
+        lines = inhandle.read().splitlines()
+    hc_vals = [x.split(",") for x in lines]
+
+    allh = np.array([float(gene[1]) for gene in hc_vals])
+    q = np.quantile(allh, [0.25,0.75])
+    hc_threshold = max(0.01, q[1] + 1.5*(q[1]-q[0]))
+    print(f"Entropy threshold set to {hc_threshold}.")
+
+    for gene in hc_vals:
+        if float(gene[1]) > hc_threshold:
+            name = gene[0].split(".")[0]
+            if name in genes:
+                genes.remove(name)
+
+    print("Reading alignments...")
+    filtered_alignment_names = []
+    filt_genes = set(genes)
+    for file in gene_alignment_files:
+        name = file.split(".")[0]
+        if name in filt_genes:
+            filtered_alignment_names.append(file)
+    gene_names = np.array([x.split(".")[0] for x in filtered_alignment_names])
+    filtered_alignment_paths = [gene_alignments_dir + x for x in filtered_alignment_names]
+    preload = _build_pairwise_preload(filtered_alignment_paths, threads)
+
+    return pairs, gene_names, gene_alignments_dir, preload
 
 def parse_pangenome(output_dir, threads):
     if output_dir[-1] != "/":

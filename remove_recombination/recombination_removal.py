@@ -6,7 +6,8 @@ from tqdm import tqdm
 import numpy as np
 import networkx as nx
 
-from remove_recombination.read_panout import parse_pangenome 
+from remove_recombination.read_panout import collate_pair_chunk
+from remove_recombination.read_panout import parse_pangenome_preload
 
 from remove_recombination.write_output import remove_recombinant_seqs
 from remove_recombination.write_output import write_rm_estimate
@@ -14,6 +15,50 @@ from remove_recombination.write_output import get_core_gene_nodes
 from remove_recombination.write_output import concatenate_core_genome_alignments
 from remove_recombination.recomb_model_functions import *
 from remove_recombination.recombination_networks import *
+
+PAIR_CHUNK_SIZE = 10000
+
+
+def iter_pair_chunks(pairs, chunk_size):
+    for chunk_start in range(0, len(pairs), chunk_size):
+        chunk_end = min(chunk_start + chunk_size, len(pairs))
+        yield chunk_start, chunk_end, pairs[chunk_start:chunk_end]
+
+
+def write_pairwise_distribution_rows(outhandle, pairs, gene_names, chunk_start, ordered_chunk):
+    for local_idx, (ordered_dist_len, ordered_gene_ids) in enumerate(ordered_chunk):
+        pair_idx = chunk_start + local_idx
+        outline = pairs[pair_idx] + ","
+        dists = ";".join(ordered_dist_len[:, 0].astype(str)) + ","
+        lens = ";".join(ordered_dist_len[:, 1].astype(str)) + ","
+        genes = ";".join(gene_names[int(x)] for x in ordered_gene_ids)
+        outline += dists
+        outline += lens
+        outline += genes
+        outhandle.write(outline + "\n")
+
+
+def fold_chunk_results(
+    chunk_start,
+    ordered_chunk,
+    chunk_results,
+    gene_names,
+    total_dists,
+    gene_recombination_dic,
+    recombinant_gene_pair_dist,
+):
+    for local_idx, ((ordered_dist_len, ordered_gene_ids), (pair_recombinants, pair_dists)) in enumerate(
+        zip(ordered_chunk, chunk_results)
+    ):
+        pair_idx = chunk_start + local_idx
+        gene_idx_to_dist = dict(zip(ordered_gene_ids, ordered_dist_len[:, 0]))
+        for gene in pair_recombinants:
+            gene_name = gene_names[gene]
+            gene_recombination_dic[gene_name].append(pair_idx)
+            recombinant_gene_pair_dist[gene_name][pair_idx] = int(gene_idx_to_dist[gene])
+
+        total_dists[pair_idx] = pair_dists[0]
+
 
 def main():
     import argparse
@@ -65,16 +110,12 @@ def main():
         raise ValueError("Core threshold must be in the range (0, 1].")
         
     #Load in relevant info from genes
-    pairs, pairwise_differences, gene_names, alignment_dir = parse_pangenome(
+    pair_tuples, gene_names, alignment_dir, preload = parse_pangenome_preload(
         args.outdir,
         args.n_cpu,
     )
-    
-    #Order genes from least snps/length to greatest snps/length
-    ordered_pairs = order_pairwise_diffs(pairwise_differences)
-    if len(ordered_pairs) != len(pairs):
-        raise ValueError("Pairwise analysis inputs do not match the pair list.")
-    pair_index_to_isolates = [pair.split("-", 1) for pair in pairs]
+    pairs = ["-".join(pair) for pair in pair_tuples]
+    pair_index_to_isolates = pair_tuples
     
     #Set up some empty dics for results
     gene_recombination_dic = defaultdict(list)
@@ -99,59 +140,51 @@ def main():
     #     cleaned_dists[pair] = dists[1]
     #     pairwise_rm_estimates = dists[2]/dists[1]
     
-    #output debug files
-    if args.write_data:
-        with open(args.outdir + "pairwise_difference_distributions.csv", 
-                  'w+') as outhandle:
-            outhandle.write("pair,diffs,lens,gene_names\n")
-            for pairidx in range(len(pairs)):
-                outline = pairs[pairidx] +','
-                dists = ';'.join(ordered_pairs[pairidx][0][:,0].astype(str)) +','
-                lens = ";".join(ordered_pairs[pairidx][0][:,1].astype(str)) +','
-                geneids = ordered_pairs[pairidx][1].astype(str)
-                genes = ';'.join(gene_names[int(x)] for x in geneids)
-                outline += dists
-                outline += lens
-                outline += genes
-                outhandle.write(outline + '\n')
-                
     print("Identifying recombinants...")
-    
-    #
-    
-    #if args.method =="bayesian":
-         # results = Parallel(n_jobs=args.n_cpu, 
-         #                                                      prefer="process")(
-         #    delayed(recombination_analysis_bayesian)(ordered_pairs[index]) for index in tqdm(range(len(ordered_pairs))))
-         # pairwise_recombinant_genes, mean_distances = zip(*results)                                                         
-    #elif args.method == "frequentist":
-        # results = Parallel(n_jobs=args.n_cpu, 
-        #                                                       prefer="process")(
-        #     delayed(recombination_analysis_frequentist)(ordered_pairs[index]) for index in tqdm(range(len(ordered_pairs)))) 
-        # pairwise_recombinant_genes, mean_distances = zip(*results)
-        
-    results = do_recombination_analysis(ordered_pairs, args.method, args.n_cpu)
-    if len(results) != len(pairs):
-        raise ValueError("Pairwise analysis results do not match the pair list.")
-    pairwise_recombinant_genes, mean_distances = zip(*results) 
-    
-    #Reformat pairwise results
-    no_of_pairs = len(ordered_pairs)
-    for pair_idx in range(no_of_pairs):
-        pair_recombinants = pairwise_recombinant_genes[pair_idx]
-        pair_dists = mean_distances[pair_idx]
-        gene_idx_to_dist = dict(
-            zip(
-                ordered_pairs[pair_idx][1],
-                ordered_pairs[pair_idx][0][:, 0],
-            )
-        )
-        for gene in pair_recombinants:
-            gene_name = gene_names[gene]
-            gene_recombination_dic[gene_name].append(pair_idx)
-            recombinant_gene_pair_dist[gene_name][pair_idx] = int(gene_idx_to_dist[gene])
 
-        total_dists[pair_idx] = pair_dists[0]
+    pairwise_out = None
+    if args.write_data:
+        pairwise_out = open(
+            args.outdir + "pairwise_difference_distributions.csv",
+            "w+",
+        )
+        pairwise_out.write("pair,diffs,lens,gene_names\n")
+
+    try:
+        for chunk_start, chunk_end, chunk_pairs in iter_pair_chunks(
+            pair_tuples,
+            PAIR_CHUNK_SIZE,
+        ):
+            collated_chunk = collate_pair_chunk(chunk_pairs, preload)
+            ordered_chunk = order_pairwise_diffs_chunk(collated_chunk)
+            chunk_results = analyse_pair_chunk(ordered_chunk, args.method)
+
+            if len(chunk_results) != (chunk_end - chunk_start):
+                raise ValueError("Chunk analysis results do not match the pair slice.")
+
+            if pairwise_out is not None:
+                write_pairwise_distribution_rows(
+                    pairwise_out,
+                    pairs,
+                    gene_names,
+                    chunk_start,
+                    ordered_chunk,
+                )
+
+            fold_chunk_results(
+                chunk_start,
+                ordered_chunk,
+                chunk_results,
+                gene_names,
+                total_dists,
+                gene_recombination_dic,
+                recombinant_gene_pair_dist,
+            )
+
+            del collated_chunk, ordered_chunk, chunk_results
+    finally:
+        if pairwise_out is not None:
+            pairwise_out.close()
     
     if not gene_recombination_dic:
         print("No recombinant genes identified.")
