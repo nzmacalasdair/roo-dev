@@ -1,5 +1,7 @@
 import networkx as nx
 
+import sys
+
 def build_recombination_network(recombinant_pairs, pair_index_to_isolates):
     gene_network = nx.Graph()
     for pair_idx in recombinant_pairs:
@@ -27,6 +29,12 @@ def identify_genuine_recombinants(G):
         
         #get first non-max node
         second_degree = next((d for d in sorted_degs if d < sorted_degs[0]), None)
+        
+        if second_degree == None:
+            #No non-max node, entire graph is equally connected
+            #Gene is suspicious, get rid of all isolates in this component
+            genuine_isolates += list(H.nodes)
+            continue
         
         if (sorted_degs[0] / sorted_degs[second_degree]) >= 3:
             # one or more obvious hubs
