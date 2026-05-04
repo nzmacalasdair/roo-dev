@@ -51,8 +51,8 @@ def remove_recombinant_seqs(recombinations, out_dir, alignment_dir, all_genes):
         #         del sequence_names[index2remove]
                 
         if len(filtered) > 0:
-            SeqIO.write(sequences, outname, 'fasta')
-        elif len(sequences) == 0:
+            SeqIO.write(filtered, outname, 'fasta')
+        elif len(filtered) == 0:
             print(f"All sequences removed in {gene}")
             
     
