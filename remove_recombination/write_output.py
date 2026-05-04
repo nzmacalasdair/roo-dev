@@ -33,15 +33,24 @@ def remove_recombinant_seqs(recombinations, out_dir, alignment_dir, all_genes):
         sequences = list(SeqIO.parse(alignment, 'fasta'))
         sequence_names = [x.id for x in sequences]
         
-        for recombinant in recombinations.get(gene, []):
-            fasta_ids = [i for i in sequence_names if recombinant in i]
-            indexes2remove = []
-            for fid in fasta_ids:
-                indexes2remove.append(sequence_names.index(fid))
-            for index2remove in sorted(indexes2remove, reverse=True):
-                del sequences[index2remove]
-                del sequence_names[index2remove]
-        if len(sequences) > 0:
+        
+        recombinant_ids = set(recombinations.get(gene, []))
+
+        filtered = [
+            record for record in sequences
+            if record.id.split(";")[0] not in recombinant_ids
+            ]
+        
+        # for recombinant in recombinations.get(gene, []):
+        #     fasta_ids = [i for i in sequence_names if recombinant in i]
+        #     indexes2remove = []
+        #     for fid in fasta_ids:
+        #         indexes2remove.append(sequence_names.index(fid))
+        #     for index2remove in sorted(indexes2remove, reverse=True):
+        #         del sequences[index2remove]
+        #         del sequence_names[index2remove]
+                
+        if len(filtered) > 0:
             SeqIO.write(sequences, outname, 'fasta')
         elif len(sequences) == 0:
             print(f"All sequences removed in {gene}")
