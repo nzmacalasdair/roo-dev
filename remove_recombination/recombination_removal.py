@@ -1,5 +1,7 @@
 import os
+import multiprocessing as mp
 from collections import defaultdict
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from tqdm import tqdm
 
@@ -17,6 +19,35 @@ from remove_recombination.recomb_model_functions import *
 from remove_recombination.recombination_networks import *
 
 PAIR_CHUNK_SIZE = 10000
+PARALLEL_ANALYSIS_MIN_BLOCKS = 2
+
+WORKER_PAIR_TUPLES = None
+WORKER_PAIR_NAMES = None
+WORKER_GENE_NAMES = None
+WORKER_PRELOAD = None
+WORKER_METHOD = None
+WORKER_WRITE_DATA = None
+
+
+def _init_chunk_worker(pair_tuples, pair_names, gene_names, preload, method, write_data):
+    global WORKER_PAIR_TUPLES
+    global WORKER_PAIR_NAMES
+    global WORKER_GENE_NAMES
+    global WORKER_PRELOAD
+    global WORKER_METHOD
+    global WORKER_WRITE_DATA
+
+    os.environ["OMP_NUM_THREADS"] = "1"
+    os.environ["OPENBLAS_NUM_THREADS"] = "1"
+    os.environ["MKL_NUM_THREADS"] = "1"
+    os.environ["NUMEXPR_NUM_THREADS"] = "1"
+
+    WORKER_PAIR_TUPLES = pair_tuples
+    WORKER_PAIR_NAMES = pair_names
+    WORKER_GENE_NAMES = gene_names
+    WORKER_PRELOAD = preload
+    WORKER_METHOD = method
+    WORKER_WRITE_DATA = write_data
 
 
 def iter_pair_chunks(pairs, chunk_size):
@@ -36,6 +67,21 @@ def write_pairwise_distribution_rows(outhandle, pairs, gene_names, chunk_start, 
         outline += lens
         outline += genes
         outhandle.write(outline + "\n")
+
+
+def build_pairwise_distribution_rows(pairs, gene_names, chunk_start, ordered_chunk):
+    rows = []
+    for local_idx, (ordered_dist_len, ordered_gene_ids) in enumerate(ordered_chunk):
+        pair_idx = chunk_start + local_idx
+        outline = pairs[pair_idx] + ","
+        dists = ";".join(ordered_dist_len[:, 0].astype(str)) + ","
+        lens = ";".join(ordered_dist_len[:, 1].astype(str)) + ","
+        genes = ";".join(gene_names[int(x)] for x in ordered_gene_ids)
+        outline += dists
+        outline += lens
+        outline += genes
+        rows.append(outline + "\n")
+    return rows
 
 
 def fold_chunk_results(
@@ -58,6 +104,62 @@ def fold_chunk_results(
             recombinant_gene_pair_dist[gene_name][pair_idx] = int(gene_idx_to_dist[gene])
 
         total_dists[pair_idx] = pair_dists[0]
+
+
+def process_pair_block(chunk_start, chunk_end):
+    chunk_pairs = WORKER_PAIR_TUPLES[chunk_start:chunk_end]
+    collated_chunk = collate_pair_chunk(chunk_pairs, WORKER_PRELOAD)
+    ordered_chunk = order_pairwise_diffs_chunk(collated_chunk)
+    chunk_results = analyse_pair_chunk(ordered_chunk, WORKER_METHOD)
+
+    block_total_dists = []
+    recombinant_entries = []
+    for local_idx, ((ordered_dist_len, ordered_gene_ids), (pair_recombinants, pair_dists)) in enumerate(
+        zip(ordered_chunk, chunk_results)
+    ):
+        pair_idx = chunk_start + local_idx
+        block_total_dists.append(pair_dists[0])
+        gene_idx_to_dist = dict(zip(ordered_gene_ids, ordered_dist_len[:, 0]))
+        for gene_idx in pair_recombinants:
+            recombinant_entries.append(
+                (
+                    WORKER_GENE_NAMES[gene_idx],
+                    pair_idx,
+                    int(gene_idx_to_dist[gene_idx]),
+                )
+            )
+
+    distribution_rows = None
+    if WORKER_WRITE_DATA:
+        distribution_rows = build_pairwise_distribution_rows(
+            WORKER_PAIR_NAMES,
+            WORKER_GENE_NAMES,
+            chunk_start,
+            ordered_chunk,
+        )
+
+    return {
+        "chunk_start": chunk_start,
+        "chunk_end": chunk_end,
+        "total_dists": block_total_dists,
+        "recombinant_entries": recombinant_entries,
+        "distribution_rows": distribution_rows,
+    }
+
+
+def merge_block_result(
+    block_result,
+    total_dists,
+    gene_recombination_dic,
+    recombinant_gene_pair_dist,
+):
+    chunk_start = block_result["chunk_start"]
+    for local_idx, total_dist in enumerate(block_result["total_dists"]):
+        total_dists[chunk_start + local_idx] = total_dist
+
+    for gene_name, pair_idx, gene_dist in block_result["recombinant_entries"]:
+        gene_recombination_dic[gene_name].append(pair_idx)
+        recombinant_gene_pair_dist[gene_name][pair_idx] = gene_dist
 
 
 def main():
@@ -142,6 +244,11 @@ def main():
     
     print("Identifying recombinants...")
 
+    block_ranges = [
+        (chunk_start, min(chunk_start + PAIR_CHUNK_SIZE, len(pair_tuples)))
+        for chunk_start in range(0, len(pair_tuples), PAIR_CHUNK_SIZE)
+    ]
+
     pairwise_out = None
     if args.write_data:
         pairwise_out = open(
@@ -151,43 +258,82 @@ def main():
         pairwise_out.write("pair,diffs,lens,gene_names\n")
 
     try:
-        for chunk_start, chunk_end, chunk_pairs in iter_pair_chunks(
-            pair_tuples,
-            PAIR_CHUNK_SIZE,
-        ):
-            collated_chunk = collate_pair_chunk(chunk_pairs, preload)
-            ordered_chunk = order_pairwise_diffs_chunk(collated_chunk)
-            chunk_results = analyse_pair_chunk(ordered_chunk, args.method)
-
-            if len(chunk_results) != (chunk_end - chunk_start):
-                raise ValueError("Chunk analysis results do not match the pair slice.")
-
-            if pairwise_out is not None:
-                write_pairwise_distribution_rows(
-                    pairwise_out,
+        with tqdm(total=len(pair_tuples), desc="Identifying recombinants") as pbar:
+            if args.n_cpu == 1 or len(block_ranges) < PARALLEL_ANALYSIS_MIN_BLOCKS:
+                _init_chunk_worker(
+                    pair_tuples,
                     pairs,
                     gene_names,
-                    chunk_start,
-                    ordered_chunk,
+                    preload,
+                    args.method,
+                    args.write_data,
                 )
+                for chunk_start, chunk_end in block_ranges:
+                    block_result = process_pair_block(chunk_start, chunk_end)
+                    merge_block_result(
+                        block_result,
+                        total_dists,
+                        gene_recombination_dic,
+                        recombinant_gene_pair_dist,
+                    )
+                    if pairwise_out is not None:
+                        pairwise_out.writelines(block_result["distribution_rows"])
+                    pbar.update(chunk_end - chunk_start)
+            else:
+                ctx = mp.get_context("fork")
+                pending_rows = {}
+                next_chunk_idx_to_write = 0
+                block_start_order = [chunk_start for chunk_start, _ in block_ranges]
 
-            fold_chunk_results(
-                chunk_start,
-                ordered_chunk,
-                chunk_results,
-                gene_names,
-                total_dists,
-                gene_recombination_dic,
-                recombinant_gene_pair_dist,
-            )
+                with ProcessPoolExecutor(
+                    max_workers=args.n_cpu,
+                    mp_context=ctx,
+                    initializer=_init_chunk_worker,
+                    initargs=(
+                        pair_tuples,
+                        pairs,
+                        gene_names,
+                        preload,
+                        args.method,
+                        args.write_data,
+                    ),
+                ) as executor:
+                    future_to_range = {
+                        executor.submit(process_pair_block, chunk_start, chunk_end): (
+                            chunk_start,
+                            chunk_end,
+                        )
+                        for chunk_start, chunk_end in block_ranges
+                    }
 
-            del collated_chunk, ordered_chunk, chunk_results
+                    for future in as_completed(future_to_range):
+                        chunk_start, chunk_end = future_to_range[future]
+                        block_result = future.result()
+                        merge_block_result(
+                            block_result,
+                            total_dists,
+                            gene_recombination_dic,
+                            recombinant_gene_pair_dist,
+                        )
+                        if pairwise_out is not None:
+                            pending_rows[chunk_start] = block_result["distribution_rows"]
+                            while (
+                                next_chunk_idx_to_write < len(block_start_order)
+                                and block_start_order[next_chunk_idx_to_write] in pending_rows
+                            ):
+                                next_chunk_start = block_start_order[next_chunk_idx_to_write]
+                                pairwise_out.writelines(pending_rows.pop(next_chunk_start))
+                                next_chunk_idx_to_write += 1
+                        pbar.update(chunk_end - chunk_start)
     finally:
         if pairwise_out is not None:
             pairwise_out.close()
     
     if not gene_recombination_dic:
         print("No recombinant genes identified.")
+    else:
+        for gene in gene_recombination_dic:
+            gene_recombination_dic[gene] = sorted(set(gene_recombination_dic[gene]))
 
     #Reduce recombinant pairs to only isolates where recombination is present
     #Do this by making a network and taking only isolates of degree > 2
