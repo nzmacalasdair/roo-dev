@@ -1,4 +1,5 @@
 import os
+import shutil
 
 from Bio import SeqIO
 from Bio import AlignIO
@@ -20,6 +21,15 @@ def write_rm_estimate(rm_regression, output_dir):
 def remove_recombinant_seqs(recombinations, out_dir, alignment_dir, all_genes):
     for gene in all_genes:
         alignment = os.path.join(alignment_dir, gene + ".aln.fas")
+        outname = os.path.join(
+          out_dir,
+          "recombination_free_aligned_genes",
+          gene + ".aln.fas",
+          )
+        if gene not in recombinations or not recombinations[gene]:
+            shutil.copy2(alignment, outname)
+            continue
+        
         sequences = list(SeqIO.parse(alignment, 'fasta'))
         sequence_names = [x.id for x in sequences]
         
@@ -32,11 +42,6 @@ def remove_recombinant_seqs(recombinations, out_dir, alignment_dir, all_genes):
                 del sequences[index2remove]
                 del sequence_names[index2remove]
         if len(sequences) > 0:
-            outname = os.path.join(
-                out_dir,
-                "recombination_free_aligned_genes",
-                gene + ".aln.fas",
-            )
             SeqIO.write(sequences, outname, 'fasta')
         elif len(sequences) == 0:
             print(f"All sequences removed in {gene}")
