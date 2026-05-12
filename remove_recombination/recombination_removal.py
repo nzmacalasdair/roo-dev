@@ -360,8 +360,9 @@ def main():
     with open(args.outdir + "recombinant_gene_ids.csv", 'w+') as outhandle:
        outhandle.write("Gene,Recombinant_Isolates\n")
        for gene in actual_recombinants_to_remove:
-           outline = gene +','+ ";".join(actual_recombinants_to_remove[gene])
-           outhandle.write(outline + '\n')
+           if len(actual_recombinants_to_remove[gene]) > 0:
+               outline = gene +','+ ";".join(actual_recombinants_to_remove[gene])
+               outhandle.write(outline + '\n')
 
     cleaned_dists, recombinant_dists, retained_pairs_by_gene = reconcile_cleaned_distances(
         total_dists,

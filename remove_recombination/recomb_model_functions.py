@@ -114,27 +114,43 @@ def find_threshold(model_probs, ordered_genes):
     return (rounded_threshold, recombinant_genes)
 
 
-def analyse_pair_frequentist(ordered_diffs, ordered_lengths, ordered_genes):
-    
+def _analyse_pair_frequentist_scalar(ordered_diffs, ordered_lengths, ordered_genes):
     average_proportion = sum(ordered_diffs) / sum(ordered_lengths)
     threshold = 0
-    
+
     for cutoff in range(1, len(ordered_diffs)):
-        pvalue = 1 - stats.binom.cdf(max(ordered_diffs[cutoff-1], 0), 
-                                     ordered_lengths[cutoff-1],
-                                     average_proportion)
-        multtest_alpha = 0.05/len(ordered_diffs)
+        pvalue = 1 - stats.binom.cdf(
+            max(ordered_diffs[cutoff - 1], 0),
+            ordered_lengths[cutoff - 1],
+            average_proportion,
+        )
+        multtest_alpha = 0.05 / len(ordered_diffs)
         if pvalue < multtest_alpha:
             threshold = cutoff
             break
-        else:
-            continue
-    #Handle case where no genes are recombinant
     if threshold == 0:
         threshold = len(ordered_diffs)
-    
+
     recombinant_genes = ordered_genes[threshold:]
-    
+
+    return (threshold, recombinant_genes)
+
+
+def analyse_pair_frequentist(ordered_diffs, ordered_lengths, ordered_genes):
+    average_proportion = np.sum(ordered_diffs) / np.sum(ordered_lengths)
+    multtest_alpha = 0.05 / len(ordered_diffs)
+
+    # Vectorize the per-cutoff binomial tail test used by the scalar implementation.
+    successes = np.maximum(ordered_diffs[:-1], 0)
+    pvalues = stats.binom.sf(successes, ordered_lengths[:-1], average_proportion)
+    hits = np.flatnonzero(pvalues < multtest_alpha)
+    if hits.size == 0:
+        threshold = len(ordered_diffs)
+    else:
+        threshold = int(hits[0] + 1)
+
+    recombinant_genes = ordered_genes[threshold:]
+
     return (threshold, recombinant_genes)
     
 
