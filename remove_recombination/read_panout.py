@@ -259,10 +259,13 @@ def collate_pair_chunk(chunk_pairs, preload):
     return collated_chunk
 
 
-def parse_pangenome_preload(output_dir, threads):
+def parse_pangenome_preload(output_dir, threads, IGRs=False):
     if output_dir[-1] != "/":
         output_dir += "/"
-    gene_pa_file = output_dir + "gene_presence_absence.csv"
+    if IGRs:
+        gene_pa_file = output_dir + "IGR_presence_absence.csv"
+    else:
+        gene_pa_file = output_dir + "gene_presence_absence.csv"
     if not os.path.isfile(gene_pa_file):
         raise ValueError("Panaroo output is missing, is the output directory correct?")
     with open(gene_pa_file) as inhandle:
@@ -270,36 +273,43 @@ def parse_pangenome_preload(output_dir, threads):
     isolates = firstline.split(",")[3:]
     isolates = [x.strip() for x in isolates]
     pairs = get_pairs(isolates)
-
-    gene_alignments_dir = output_dir + "codon_aligned_gene_sequences/"
-    if not os.path.isdir(gene_alignments_dir):
-        gene_alignments_dir = output_dir + "aligned_gene_sequences/"
+    
+    if IGRs:
+        gene_alignments_dir = output_dir + "aligned_IGR_sequences/"
+    else:
+        gene_alignments_dir = output_dir + "codon_aligned_gene_sequences/"
+        if not os.path.isdir(gene_alignments_dir):
+            gene_alignments_dir = output_dir + "aligned_gene_sequences/"
     if not os.path.isdir(gene_alignments_dir):
         raise ValueError("aligned_gene_sequences directory is missing!")
 
     gene_alignment_files = sorted(os.listdir(gene_alignments_dir))
     gene_alignment_files = [x for x in gene_alignment_files if ".aln.fas" in x]
     genes = [x.split(".")[0] for x in gene_alignment_files]
-
-    with open(output_dir + "alignment_entropy.csv", 'r') as inhandle:
-        lines = inhandle.read().splitlines()
-    hc_vals = [x.split(",") for x in lines]
-
-    allh = np.array([float(gene[1]) for gene in hc_vals])
-    q = np.quantile(allh, [0.25,0.75])
-    hc_threshold = max(0.01, q[1] + 1.5*(q[1]-q[0]))
-    print(f"Entropy threshold set to {hc_threshold}.")
-
-    for gene in hc_vals:
-        if float(gene[1]) > hc_threshold:
-            name = gene[0].split(".")[0]
-            if name in genes:
-                genes.remove(name)
+    
+    if not IGRs:
+        with open(output_dir + "alignment_entropy.csv", 'r') as inhandle:
+            lines = inhandle.read().splitlines()
+        hc_vals = [x.split(",") for x in lines]
+    
+        allh = np.array([float(gene[1]) for gene in hc_vals])
+        q = np.quantile(allh, [0.25,0.75])
+        hc_threshold = max(0.01, q[1] + 1.5*(q[1]-q[0]))
+        print(f"Entropy threshold set to {hc_threshold}.")
+    
+        for gene in hc_vals:
+            if float(gene[1]) > hc_threshold:
+                name = gene[0].split(".")[0]
+                if name in genes:
+                    genes.remove(name)
 
     print("Reading alignments...")
     filtered_alignment_names = []
     filt_genes = set(genes)
     for file in gene_alignment_files:
+        seqs = SeqIO.parse(gene_alignments_dir + file, 'fasta')
+        if len(list(seqs)[0].seq) == 0:
+            continue
         name = file.split(".")[0]
         if name in filt_genes:
             filtered_alignment_names.append(file)
@@ -309,7 +319,7 @@ def parse_pangenome_preload(output_dir, threads):
 
     return pairs, gene_names, gene_alignments_dir, preload
 
-def parse_pangenome(output_dir, threads):
+def parse_pangenome(output_dir, threads, IGRs):
     if output_dir[-1] != "/":
         output_dir += "/"
     #Get all the pairwise comparison combinations
@@ -337,20 +347,21 @@ def parse_pangenome(output_dir, threads):
     genes = [x.split(".")[0] for x in gene_alignment_files]
     
     #Filter genes based on entropy scores
-    with open(output_dir + "alignment_entropy.csv", 'r') as inhandle:
-        lines = inhandle.read().splitlines()
-    hc_vals = [x.split(",") for x in lines]
-    
-    allh = np.array([float(gene[1]) for gene in hc_vals])
-    q = np.quantile(allh, [0.25,0.75])
-    hc_threshold = max(0.01, q[1] + 1.5*(q[1]-q[0]))
-    print(f"Entropy threshold set to {hc_threshold}.")
-    
-    for gene in hc_vals:
-        if float(gene[1]) > hc_threshold:
-            name = gene[0].split(".")[0]
-            if name in genes:
-                genes.remove(name)
+    if not IGRs:
+        with open(output_dir + "alignment_entropy.csv", 'r') as inhandle:
+            lines = inhandle.read().splitlines()
+        hc_vals = [x.split(",") for x in lines]
+        
+        allh = np.array([float(gene[1]) for gene in hc_vals])
+        q = np.quantile(allh, [0.25,0.75])
+        hc_threshold = max(0.01, q[1] + 1.5*(q[1]-q[0]))
+        print(f"Entropy threshold set to {hc_threshold}.")
+        
+        for gene in hc_vals:
+            if float(gene[1]) > hc_threshold:
+                name = gene[0].split(".")[0]
+                if name in genes:
+                    genes.remove(name)
     #Get all the distributions of pairwise differences
     
     pairs, pairwise_differences, gene_names, = get_all_pairwise_diffs(

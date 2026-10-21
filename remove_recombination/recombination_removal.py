@@ -197,6 +197,9 @@ def main():
                         action="store_true",
                         help="""Output pairwise distributions and per-gene
                         reconbimation networks used to identify recombinants""")
+    parser.add_argument("--IGR",
+                        action="store_true",
+                        help="""Analyse a panIGRoo IGR output directory""")
     args = parser.parse_args()
     
     #Make sure formatting is correct for panaroo dir, and create new out dir
@@ -215,6 +218,7 @@ def main():
     pair_tuples, gene_names, alignment_dir, preload = parse_pangenome_preload(
         args.outdir,
         args.n_cpu,
+        args.IGR
     )
     pairs = ["-".join(pair) for pair in pair_tuples]
     pair_index_to_isolates = pair_tuples
